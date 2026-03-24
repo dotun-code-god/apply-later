@@ -1,0 +1,23 @@
+{
+  "name": "apply-later",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "yarn@1.22.22",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:backend": "turbo run dev --filter=backend",
+    "dev:frontend": "turbo run dev --filter=frontend",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "prisma:generate": "yarn workspace backend prisma:generate",
+    "prisma:migrate:dev": "yarn workspace backend prisma:migrate:dev",
+    "prisma:studio": "yarn workspace backend prisma:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6"
+  }
+}

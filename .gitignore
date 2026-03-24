@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# App-specific outputs
+apps/*/node_modules/
+apps/*/dist/
+
+# Turborepo
+.turbo/
