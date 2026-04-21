@@ -1,0 +1,55 @@
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function Signup() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-[linear-gradient(155deg,hsl(var(--background)),hsl(var(--secondary)/0.72),hsl(var(--primary)/0.1))] px-4 py-8 md:px-8">
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mx-auto w-full max-w-lg rounded-3xl border border-border/70 bg-card p-6 shadow-xl md:p-8">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl gradient-hero text-xs font-semibold text-primary-foreground">A</span>
+          ApplyLater
+        </Link>
+
+        <h1 className="mt-5 font-display text-3xl font-semibold">Create your account</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Set up your workspace to start tracking opportunities.</p>
+
+        <form className="mt-6 space-y-4" onSubmit={(e) => { e.preventDefault(); navigate("/verify-email"); }}>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Full name</label>
+            <Input required placeholder="Alex Johnson" className="h-11 rounded-xl" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Email</label>
+            <Input type="email" required placeholder="you@example.com" className="h-11 rounded-xl" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Password</label>
+            <Input type="password" required placeholder="At least 8 characters" className="h-11 rounded-xl" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Confirm password</label>
+            <Input type="password" required placeholder="Repeat your password" className="h-11 rounded-xl" />
+          </div>
+          <Button type="submit" className="h-11 w-full rounded-xl">
+            Sign up
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </form>
+
+        <div className="mt-5 rounded-2xl border border-success/30 bg-success/10 p-3 text-sm text-muted-foreground">
+          <p className="inline-flex items-center gap-2 font-medium text-foreground"><ShieldCheck className="h-4 w-4 text-success" />Security first</p>
+          <p className="mt-1">Your authentication screens are now structured for backend token flow integration.</p>
+        </div>
+
+        <p className="mt-5 text-sm text-muted-foreground">
+          Already have an account? <Link to="/login" className="font-medium text-primary hover:underline">Login</Link>
+        </p>
+      </motion.div>
+    </div>
+  );
+}
