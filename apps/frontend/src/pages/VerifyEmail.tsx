@@ -2,9 +2,37 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { authApi } from "@/lib/api/auth-api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function VerifyEmail() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+  const { toast } = useToast();
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+
+    (async () => {
+      try {
+        setIsVerifying(true);
+        await authApi.verifyEmail(token);
+        toast({ title: "Email verified", description: "Your account is now verified." });
+      } catch {
+        toast({
+          title: "Verification failed",
+          description: "Token is invalid or expired.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsVerifying(false);
+      }
+    })();
+  }, [token, toast]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.14),transparent_35%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--secondary)/0.7))] px-4 py-8">
@@ -13,8 +41,16 @@ export default function VerifyEmail() {
           <CheckCircle2 className="h-7 w-7" />
         </div>
 
-        <h1 className="mt-4 font-display text-3xl font-semibold">Verify your email</h1>
-        <p className="mt-2 text-sm text-muted-foreground">We sent a verification link to your inbox. Confirm your email to activate your account.</p>
+        <h1 className="mt-4 font-display text-3xl font-semibold">
+          {token ? "Email verification" : "Verify your email"}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {token
+            ? isVerifying
+              ? "Checking your verification token..."
+              : "Verification processed. You can continue to login or dashboard."
+            : "We sent a verification link to your inbox. Confirm your email to activate your account."}
+        </p>
 
         <div className="mt-5 rounded-2xl border border-border/70 bg-background p-4 text-left text-sm">
           <p className="inline-flex items-center gap-2 font-medium"><Mail className="h-4 w-4 text-primary" /> Need help?</p>

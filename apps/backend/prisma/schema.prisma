@@ -6,10 +6,66 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                Int                      @id @default(autoincrement())
+  email             String                   @unique
+  name              String?
+  role              Role                     @default(USER)
+  passwordHash      String?
+  googleId          String?                  @unique
+  emailVerifiedAt   DateTime?
+  tokenVersion      Int                      @default(0)
+  refreshTokens     RefreshToken[]
+  emailTokens       EmailVerificationToken[]
+  passwordResetLogs PasswordResetToken[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+}
+
+model RefreshToken {
+  id            String    @id @default(cuid())
+  jti           String    @unique
+  tokenHash     String
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  replacedByJti String?
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  tokenHash  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  tokenHash  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

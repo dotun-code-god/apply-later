@@ -3,6 +3,7 @@ import { Activity, Bell, Calendar, ChevronRight, Clock3, LayoutDashboard, LogOut
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/features/auth/auth-provider";
 
 const stats = [
   { label: "Total Applications", value: "73", note: "+9% this month" },
@@ -27,6 +28,7 @@ const reminders = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -65,8 +67,15 @@ export default function Dashboard() {
 
             <div className="mt-auto rounded-2xl border border-border/70 bg-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Signed in as</p>
-              <p className="mt-1 font-medium">Guest User</p>
-              <Button variant="outline" className="mt-3 w-full justify-start rounded-xl" onClick={() => navigate("/login")}>
+              <p className="mt-1 font-medium">{user?.name ?? user?.email ?? 'User'}</p>
+              <Button
+                variant="outline"
+                className="mt-3 w-full justify-start rounded-xl"
+                onClick={async () => {
+                  await logout();
+                  navigate('/login');
+                }}
+              >
                 <LogOut className="h-4 w-4" />
                 Logout
               </Button>

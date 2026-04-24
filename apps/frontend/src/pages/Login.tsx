@@ -3,9 +3,34 @@ import { motion } from "framer-motion";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useAuth } from "@/features/auth/auth-provider";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login, googleSignIn } = useAuth();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
+
+  const onSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      setIsSubmitting(true);
+      await login(form);
+      navigate("/dashboard");
+    } catch {
+      toast({
+        title: "Login failed",
+        description: "Check your credentials and email verification status.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[linear-gradient(160deg,hsl(var(--secondary)/0.8),hsl(var(--background))_42%,hsl(var(--primary)/0.09))] px-4 py-8 md:px-8">
@@ -34,20 +59,34 @@ export default function Login() {
             <h2 className="font-display text-3xl font-semibold">Login to your account</h2>
             <p className="mt-1 text-sm text-muted-foreground">Continue where you left off.</p>
 
-            <form className="mt-6 space-y-4" onSubmit={(e) => { e.preventDefault(); navigate("/dashboard"); }}>
+            <form className="mt-6 space-y-4" onSubmit={onSubmit}>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Email address</label>
-                <Input type="email" required placeholder="you@example.com" className="h-11 rounded-xl" />
+                <Input
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  className="h-11 rounded-xl"
+                  value={form.email}
+                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                />
               </div>
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label className="block text-sm font-medium">Password</label>
                   <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
                 </div>
-                <Input type="password" required placeholder="Enter your password" className="h-11 rounded-xl" />
+                <Input
+                  type="password"
+                  required
+                  placeholder="Enter your password"
+                  className="h-11 rounded-xl"
+                  value={form.password}
+                  onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                />
               </div>
-              <Button type="submit" className="h-11 w-full rounded-xl">
-                Login
+              <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
+                {isSubmitting ? "Logging in..." : "Login"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </form>
@@ -62,6 +101,23 @@ export default function Login() {
               <KeyRound className="h-4 w-4" />
               Continue with magic link
             </Button>
+
+            <div className="mt-4">
+              <GoogleSignInButton
+                onCredential={async (credential) => {
+                  try {
+                    await googleSignIn(credential);
+                    navigate("/dashboard");
+                  } catch {
+                    toast({
+                      title: "Google sign in failed",
+                      description: "Please try again.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              />
+            </div>
 
             <p className="mt-5 text-sm text-muted-foreground">
               New to ApplyLater? <Link to="/signup" className="font-medium text-primary hover:underline">Create an account</Link>

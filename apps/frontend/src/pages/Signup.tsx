@@ -3,9 +3,52 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useAuth } from "@/features/auth/auth-provider";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Signup() {
   const navigate = useNavigate();
+  const { signup } = useAuth();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const onSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (form.password !== form.confirmPassword) {
+      toast({
+        title: "Password mismatch",
+        description: "Passwords must match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await signup({
+        name: form.name,
+        email: form.email,
+        password: form.password,
+      });
+      navigate("/verify-email");
+    } catch {
+      toast({
+        title: "Sign up failed",
+        description: "This email might already exist or is invalid.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[linear-gradient(155deg,hsl(var(--background)),hsl(var(--secondary)/0.72),hsl(var(--primary)/0.1))] px-4 py-8 md:px-8">
@@ -18,25 +61,54 @@ export default function Signup() {
         <h1 className="mt-5 font-display text-3xl font-semibold">Create your account</h1>
         <p className="mt-1 text-sm text-muted-foreground">Set up your workspace to start tracking opportunities.</p>
 
-        <form className="mt-6 space-y-4" onSubmit={(e) => { e.preventDefault(); navigate("/verify-email"); }}>
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Full name</label>
-            <Input required placeholder="Alex Johnson" className="h-11 rounded-xl" />
+            <Input
+              required
+              placeholder="Alex Johnson"
+              className="h-11 rounded-xl"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Email</label>
-            <Input type="email" required placeholder="you@example.com" className="h-11 rounded-xl" />
+            <Input
+              type="email"
+              required
+              placeholder="you@example.com"
+              className="h-11 rounded-xl"
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Password</label>
-            <Input type="password" required placeholder="At least 8 characters" className="h-11 rounded-xl" />
+            <Input
+              type="password"
+              required
+              placeholder="At least 8 characters"
+              className="h-11 rounded-xl"
+              value={form.password}
+              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Confirm password</label>
-            <Input type="password" required placeholder="Repeat your password" className="h-11 rounded-xl" />
+            <Input
+              type="password"
+              required
+              placeholder="Repeat your password"
+              className="h-11 rounded-xl"
+              value={form.confirmPassword}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))
+              }
+            />
           </div>
-          <Button type="submit" className="h-11 w-full rounded-xl">
-            Sign up
+          <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
+            {isSubmitting ? "Creating account..." : "Sign up"}
             <ArrowRight className="h-4 w-4" />
           </Button>
         </form>
