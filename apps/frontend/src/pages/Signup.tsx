@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useAuth } from "@/features/auth/auth-provider";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, googleSignIn } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
@@ -112,6 +113,28 @@ export default function Signup() {
             <ArrowRight className="h-4 w-4" />
           </Button>
         </form>
+
+        <div className="my-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <GoogleSignInButton
+          buttonText="signup_with"
+          onCredential={async (credential) => {
+            try {
+              await googleSignIn(credential);
+              navigate("/dashboard");
+            } catch {
+              toast({
+                title: "Google sign up failed",
+                description: "Please try again.",
+                variant: "destructive",
+              });
+            }
+          }}
+        />
 
         <p className="mt-5 text-sm text-muted-foreground">
           Already have an account? <Link to="/login" className="font-medium text-primary hover:underline">Login</Link>

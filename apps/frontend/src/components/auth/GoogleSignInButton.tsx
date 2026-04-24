@@ -29,9 +29,10 @@ declare global {
 
 interface Props {
   onCredential: (credential: string) => Promise<void>;
+  buttonText?: 'continue_with' | 'signin_with' | 'signup_with' | 'signin';
 }
 
-export function GoogleSignInButton({ onCredential }: Props) {
+export function GoogleSignInButton({ onCredential, buttonText = 'continue_with' }: Props) {
   const buttonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export function GoogleSignInButton({ onCredential }: Props) {
         type: 'standard',
         theme: 'outline',
         size: 'large',
-        text: 'continue_with',
+        text: buttonText,
         width: 400,
       });
     };
@@ -72,7 +73,7 @@ export function GoogleSignInButton({ onCredential }: Props) {
         document.body.removeChild(script);
       }
     };
-  }, [onCredential]);
+  }, [onCredential, buttonText]);
 
   return <div ref={buttonRef} className="flex justify-center" />;
 }
