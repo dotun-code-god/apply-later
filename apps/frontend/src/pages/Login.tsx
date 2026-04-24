@@ -42,10 +42,6 @@ export default function Login() {
               <h1 className="mt-2 font-display text-4xl font-semibold leading-tight">Sign in and continue your application journey</h1>
               <p className="mt-4 max-w-sm text-sm text-primary-foreground/85">Use your account to track deadlines, collaborate with teammates, and power your mobile API workflows.</p>
             </div>
-            <div className="rounded-2xl border border-primary-foreground/25 bg-primary-foreground/10 p-4 text-sm">
-              <p className="font-semibold">Demo Account Hint</p>
-              <p className="mt-1 text-primary-foreground/85">Use any email and password for now. API integration comes next.</p>
-            </div>
           </div>
         </section>
 
@@ -96,11 +92,6 @@ export default function Login() {
               <span className="text-xs uppercase tracking-wide text-muted-foreground">or</span>
               <span className="h-px flex-1 bg-border" />
             </div>
-
-            <Button variant="outline" className="h-11 w-full rounded-xl">
-              <KeyRound className="h-4 w-4" />
-              Continue with magic link
-            </Button>
 
             <div className="mt-4">
               <GoogleSignInButton

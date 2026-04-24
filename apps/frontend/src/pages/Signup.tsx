@@ -113,11 +113,6 @@ export default function Signup() {
           </Button>
         </form>
 
-        <div className="mt-5 rounded-2xl border border-success/30 bg-success/10 p-3 text-sm text-muted-foreground">
-          <p className="inline-flex items-center gap-2 font-medium text-foreground"><ShieldCheck className="h-4 w-4 text-success" />Security first</p>
-          <p className="mt-1">Your authentication screens are now structured for backend token flow integration.</p>
-        </div>
-
         <p className="mt-5 text-sm text-muted-foreground">
           Already have an account? <Link to="/login" className="font-medium text-primary hover:underline">Login</Link>
         </p>

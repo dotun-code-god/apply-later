@@ -93,7 +93,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="h-10 w-[220px] rounded-xl pl-9" placeholder="Search applications" />
+                  <Input className="h-10 w-55 rounded-xl pl-9" placeholder="Search applications" />
                 </div>
                 <Button className="rounded-xl">New Application</Button>
               </div>
@@ -124,7 +124,7 @@ export default function Dashboard() {
                   <Button variant="ghost" className="rounded-lg text-xs">See all</Button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[680px] text-sm">
+                  <table className="w-full min-w-170 text-sm">
                     <thead>
                       <tr className="bg-secondary/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                         <th className="px-4 py-3 font-medium">Opportunity</th>

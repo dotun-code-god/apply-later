@@ -61,7 +61,7 @@ export function GoogleSignInButton({ onCredential }: Props) {
         theme: 'outline',
         size: 'large',
         text: 'continue_with',
-        width: 320,
+        width: 400,
       });
     };
 

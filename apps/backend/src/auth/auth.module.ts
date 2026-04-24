@@ -10,7 +10,14 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { EmailModule } from '@/email/email.module';
 
 @Module({
-  imports: [ConfigModule, PassportModule, JwtModule.register({}), EmailModule],
+  imports: [
+    ConfigModule, 
+    PassportModule, 
+    JwtModule.register({
+      global: true,
+    }), 
+    EmailModule
+  ],
   providers: [AuthService, JwtStrategy, JwtRefreshStrategy, GoogleStrategy],
   controllers: [AuthController],
   exports: [AuthService],
