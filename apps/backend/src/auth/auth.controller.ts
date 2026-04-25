@@ -160,7 +160,7 @@ export class AuthController {
   @Public()
   @Post('verify-email')
   async verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyEmail(dto.token);
+    return this.authService.verifyEmail(dto.otp);
   }
 
   @Post('resend-verification')

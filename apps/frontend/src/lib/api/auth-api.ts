@@ -45,9 +45,9 @@ export const authApi = {
     return data;
   },
 
-  async verifyEmail(token: string) {
+  async verifyEmail(otp: string) {
     const { data } = await apiClient.post<{ verified: boolean }>('/auth/verify-email', {
-      token,
+      otp,
     });
     return data;
   },

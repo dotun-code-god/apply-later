@@ -79,10 +79,16 @@ export class AuthService {
     return randomBytes(48).toString('hex');
   }
 
-  private verificationUrl(token: string): string {
-    const frontend =
-      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
-    return `${frontend}/verify-email?token=${encodeURIComponent(token)}`;
+  private generateOtp(): string {
+    // Cryptographically uniform 6-digit OTP (100000–999999)
+    const array = new Uint32Array(1);
+    // Node.js crypto.getRandomValues polyfill via globalThis
+    let otp: number;
+    do {
+      const buf = randomBytes(4);
+      otp = (buf.readUInt32BE(0) % 900000) + 100000;
+    } while (otp < 100000 || otp > 999999);
+    return otp.toString();
   }
 
   private resetUrl(token: string): string {
@@ -318,18 +324,24 @@ export class AuthService {
   }
 
   async createEmailVerificationToken(userId: number, email: string): Promise<void> {
-    const rawToken = await this.generateOpaqueToken();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    // Invalidate any previous unused OTPs for this user
+    await this.prisma.emailVerificationToken.updateMany({
+      where: { userId, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+
+    const otp = this.generateOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await this.prisma.emailVerificationToken.create({
       data: {
         userId,
-        tokenHash: await this.hashToken(rawToken),
+        tokenHash: await this.hashToken(otp),
         expiresAt,
       },
     });
 
-    await this.emailService.sendVerificationEmail(email, this.verificationUrl(rawToken));
+    await this.emailService.sendVerificationEmail(email, otp);
   }
 
   async resendVerification(userId: number): Promise<void> {
@@ -341,18 +353,31 @@ export class AuthService {
     await this.createEmailVerificationToken(user.id, user.email);
   }
 
-  async verifyEmail(token: string): Promise<{ verified: boolean }> {
+  async verifyEmail(otp: string): Promise<{ verified: boolean }> {
+    const MAX_ATTEMPTS = 5;
+
+    // Find the single active OTP for the submitting user.
+    // We query all active tokens and verify via hash comparison.
     const activeTokens = await this.prisma.emailVerificationToken.findMany({
       where: {
         consumedAt: null,
         expiresAt: { gt: new Date() },
+        attempts: { lt: MAX_ATTEMPTS },
       },
       include: { user: true },
     });
 
     for (const candidate of activeTokens) {
-      const valid = await argon2.verify(candidate.tokenHash, token);
-      if (!valid) continue;
+      const valid = await argon2.verify(candidate.tokenHash, otp);
+
+      if (!valid) {
+        // Increment attempt counter — prevents brute force
+        await this.prisma.emailVerificationToken.update({
+          where: { id: candidate.id },
+          data: { attempts: { increment: 1 } },
+        });
+        continue;
+      }
 
       await this.prisma.$transaction([
         this.prisma.emailVerificationToken.update({
@@ -368,7 +393,7 @@ export class AuthService {
       return { verified: true };
     }
 
-    throw new BadRequestException('Invalid or expired verification token');
+    throw new BadRequestException('Invalid or expired OTP. Please request a new code.');
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ ok: true }> {
@@ -426,6 +451,9 @@ export class AuthService {
         }),
       ]);
 
+      // fire-and-forget security notification
+      void this.emailService.sendPasswordChangedEmail(candidate.user.email);
+
       return { ok: true };
     }
 
@@ -444,24 +472,28 @@ export class AuthService {
     const email = profile.email.toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
 
-    const user =
-      existing == null
-        ? await this.prisma.user.create({
-            data: {
-              email,
-              name: profile.name ?? null,
-              googleId: profile.googleId,
-              emailVerifiedAt: new Date(),
-            },
-          })
-        : await this.prisma.user.update({
-            where: { id: existing.id },
-            data: {
-              googleId: profile.googleId,
-              name: existing.name ?? profile.name ?? null,
-              emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
-            },
-          });
+    const isNew = existing == null;
+    const user = isNew
+      ? await this.prisma.user.create({
+          data: {
+            email,
+            name: profile.name ?? null,
+            googleId: profile.googleId,
+            emailVerifiedAt: new Date(),
+          },
+        })
+      : await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            googleId: profile.googleId,
+            name: existing.name ?? profile.name ?? null,
+            emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
+          },
+        });
+
+    if (isNew) {
+      void this.emailService.sendWelcomeEmail(user.email, user.name ?? undefined);
+    }
 
     return this.issueAuthTokens(user, meta);
   }

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/features/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
+import { VerifiedRoute } from "./components/auth/VerifiedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -31,11 +32,13 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
             </Route>
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+              <Route element={<VerifiedRoute />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+              </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
