@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
@@ -86,8 +87,7 @@ export default function Signup() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Password</label>
-            <Input
-              type="password"
+            <PasswordInput
               required
               placeholder="At least 8 characters"
               className="h-11 rounded-xl"
@@ -97,8 +97,7 @@ export default function Signup() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Confirm password</label>
-            <Input
-              type="password"
+            <PasswordInput
               required
               placeholder="Repeat your password"
               className="h-11 rounded-xl"

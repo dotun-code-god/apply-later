@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { useAuth } from "@/features/auth/auth-provider";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
@@ -72,8 +73,7 @@ export default function Login() {
                   <label className="block text-sm font-medium">Password</label>
                   <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
                 </div>
-                <Input
-                  type="password"
+                <PasswordInput
                   required
                   placeholder="Enter your password"
                   className="h-11 rounded-xl"

@@ -2,7 +2,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { useState } from 'react';
 import { authApi } from '@/lib/api/auth-api';
 import { useToast } from '@/hooks/use-toast';
@@ -62,11 +62,11 @@ export default function ResetPassword() {
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div>
             <label className="mb-1.5 block text-sm font-medium">New password</label>
-            <Input type="password" required minLength={8} className="h-11 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput required minLength={8} className="h-11 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium">Confirm password</label>
-            <Input type="password" required minLength={8} className="h-11 rounded-xl" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            <PasswordInput required minLength={8} className="h-11 rounded-xl" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
           </div>
           <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
             <KeyRound className="h-4 w-4" />
