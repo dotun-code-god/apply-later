@@ -99,7 +99,8 @@ export default function Login() {
                   try {
                     await googleSignIn(credential);
                     navigate("/dashboard");
-                  } catch {
+                  } catch(error) {
+                    console.log({error});
                     toast({
                       title: "Google sign in failed",
                       description: "Please try again.",

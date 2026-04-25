@@ -1,5 +1,43 @@
 import { useEffect, useRef } from 'react';
 
+let gsiScriptPromise: Promise<void> | null = null;
+let gsiInitialized = false;
+let activeCredentialHandler: ((credential: string) => Promise<void>) | null = null;
+
+function ensureGsiScriptLoaded(): Promise<void> {
+  if (window.google) {
+    return Promise.resolve();
+  }
+
+  if (gsiScriptPromise) {
+    return gsiScriptPromise;
+  }
+
+  gsiScriptPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(), { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Failed to load Google script')), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google script'));
+    document.body.appendChild(script);
+  });
+
+  return gsiScriptPromise;
+}
+
 declare global {
   interface Window {
     google?: {
@@ -34,6 +72,14 @@ interface Props {
 
 export function GoogleSignInButton({ onCredential, buttonText = 'continue_with' }: Props) {
   const buttonRef = useRef<HTMLDivElement>(null);
+  const callbackRef = useRef(onCredential);
+
+  useEffect(() => {
+    callbackRef.current = onCredential;
+    activeCredentialHandler = async (credential: string) => {
+      await callbackRef.current(credential);
+    };
+  }, [onCredential]);
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -41,20 +87,31 @@ export function GoogleSignInButton({ onCredential, buttonText = 'continue_with' 
       return;
     }
 
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
+    let isCancelled = false;
+
+    const renderGoogleButton = async () => {
+      try {
+        await ensureGsiScriptLoaded();
+      } catch {
+        return;
+      }
+
+      if (isCancelled) {
+        return;
+      }
+
       if (!window.google || !buttonRef.current) return;
 
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async (response) => {
-          if (!response.credential) return;
-          await onCredential(response.credential);
-        },
-      });
+      if (!gsiInitialized) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response) => {
+            if (!response.credential || !activeCredentialHandler) return;
+            await activeCredentialHandler(response.credential);
+          },
+        });
+        gsiInitialized = true;
+      }
 
       buttonRef.current.innerHTML = '';
       window.google.accounts.id.renderButton(buttonRef.current, {
@@ -66,14 +123,12 @@ export function GoogleSignInButton({ onCredential, buttonText = 'continue_with' 
       });
     };
 
-    document.body.appendChild(script);
+    renderGoogleButton();
 
     return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
+      isCancelled = true;
     };
-  }, [onCredential, buttonText]);
+  }, [buttonText]);
 
   return <div ref={buttonRef} className="flex justify-center" />;
 }

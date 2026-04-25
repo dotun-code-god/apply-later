@@ -20,6 +20,7 @@ import { ResetPasswordDto } from '@/auth/dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser, type AuthUser } from '@/common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { GoogleIdentityDto } from './dto/google-identity.dto';
@@ -67,6 +68,7 @@ export class AuthController {
     res.clearCookie('refresh_token', base);
   }
 
+  @Public()
   @Get('csrf-token')
   csrfToken(@Res({ passthrough: true }) res: Response) {
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -78,6 +80,7 @@ export class AuthController {
     return { csrfToken: token };
   }
 
+  @Public()
   @Post('signup')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async signup(
@@ -90,6 +93,7 @@ export class AuthController {
     return result;
   }
 
+  @Public()
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async login(
@@ -102,6 +106,7 @@ export class AuthController {
     return result;
   }
 
+  @Public()
   @Post('logout')
   @UseGuards(JwtRefreshGuard)
   async logout(
@@ -116,6 +121,7 @@ export class AuthController {
     return { ok: true };
   }
 
+  @Public()
   @Post('refresh')
   @UseGuards(JwtRefreshGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -151,6 +157,7 @@ export class AuthController {
     return { user: profile };
   }
 
+  @Public()
   @Post('verify-email')
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto.token);
@@ -163,22 +170,26 @@ export class AuthController {
     return { ok: true };
   }
 
+  @Public()
   @Post('forgot-password')
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
+  @Public()
   @Post('reset-password')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
 
+  @Public()
   @Get('google')
   @UseGuards(GoogleAuthGuard)
   googleAuth() {
     return undefined;
   }
 
+  @Public()
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   async googleCallback(
@@ -201,6 +212,7 @@ export class AuthController {
     return res.redirect(`${frontend}/dashboard`);
   }
 
+  @Public()
   @Post('google/identity')
   async googleIdentity(
     @Body() dto: GoogleIdentityDto,
