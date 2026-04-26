@@ -36,7 +36,7 @@ Core promise:
 North-star outcome:
 - Increase user conversion from saved opportunities to completed submissions.
 
----
+--- 
 
 ## 2. Product Scope and Identity
 
@@ -234,23 +234,93 @@ Fallback:
 
 ---
 
-## 12. Discover and Ranking Baseline
+## 12. Discover Page and Opportunity Feed
 
-Discover feed ranking factors:
-1. Profile relevance
-2. Deadline urgency
-3. Opportunity freshness
-4. Extraction confidence quality
-5. User engagement signals
+**MVP Status: LOW PRIORITY**
 
-Future additions:
-- Skill fit score
-- Historical completion correlation
-- Community interest trend
+Discover is strategically important but not blocking MVP launch. The framework below ensures we can expand into this pillar efficiently in Stage 4+.
+
+### Data Sources for Discover
+
+**Primary Source (MVP):**
+- User-pasted links from the community
+- Deduplicated at canonical URL level
+- Ranked by platform relevance signals
+
+**Secondary Sources (Post-MVP):**
+- Curated opportunity APIs (LinkedIn, handshake, etc.)
+- Partner opportunity channels
+- AI-generated recommendations from similar profiles
+
+### Discover Feed Ranking Factors
+
+1. Profile relevance (skill match, career stage)
+2. Deadline urgency (upcoming deadlines surface first)
+3. Opportunity freshness (recently added to platform)
+4. Extraction confidence quality (high-confidence fields boost ranking)
+5. User engagement signals (saves, applies, completion rates by similar users)
+6. Dedupe quality (canonical URL clustering prevents noise)
+
+### Future Discover Enhancements
+
+- Skill fit score (ML-based career trajectory matching)
+- Historical completion correlation (opportunities similar to ones user completed)
+- Community interest trend (rising opportunities based on saves/applies)
+- Category recommendations (based on user activity patterns)
+- Social signals (opportunities endorsed by users in your network)
+
+### Architecture Implication
+
+User-pasted links will feed a shared opportunity index. Early Discover MVP will surface only deduplicated, high-confidence opportunities. This approach:
+- Reduces infrastructure cost early
+- Creates viral loop (users discover → apply → create social proof)
+- Allows gradual ranking sophistication without blocking core product
+- Prepares for future social and discovery features
 
 ---
 
-## 13. AI Responsibilities
+## 13. Social Capital and Weak-Tie Bridging (Future Growth)
+
+**MVP Status: NOT INCLUDED** | **Target: Stage 7-8+**
+
+Research shows that 73% of people land opportunities through personal connections. ApplyLater will eventually address the "social capital gap" by helping users bridge weak ties and discover mentorship.
+
+### Problem We Solve
+
+Many opportunities and career advice are locked behind strong-tie networks (close friends, family, direct contacts). Users with smaller networks or less privileged backgrounds face friction discovering these opportunities.
+
+### Future Features (Post-MVP)
+
+**Stage 7: Mentorship Discovery**
+- User profile that surfaces relevant experience and background
+- Match with potential mentors based on career stage and field
+- Request/accept mentorship relationships
+- Mentor-specific reminders (goal check-ins, milestone reviews)
+
+**Stage 8: Weak-Tie Bridging**
+- Identify second and third-degree connections relevant to opportunity type
+- Facilitate introductions with context
+- Track who helped with each application
+- Build user's "social capital network graph"
+
+**Stage 9+: Community Intelligence**
+- Opportunity recommendations from users with similar profiles who succeeded
+- Success stories and lessons learned from community
+- Peer application reviews and feedback
+- Collective opportunity curation (trending, endorsed, hot)
+
+### Implementation Principle
+
+Social features will be opt-in and intentionally designed to avoid:
+- Pressure to share applications or network data
+- Spam from unvetted connections
+- Privacy leaks through application history
+
+Social discovery will enhance, not replace, the core execution pillar.
+
+---
+
+## 14. AI Responsibilities
 
 MVP AI responsibilities:
 - Summarize opportunity
@@ -263,6 +333,7 @@ Post-MVP AI responsibilities:
 - Stage-specific coaching
 - Checklist generation using profile context
 - Approval-gated autofill assistance
+- Opportunity recommendation based on profile and historical performance
 
 Guardrails:
 - AI suggestions are advisory.
@@ -271,7 +342,7 @@ Guardrails:
 
 ---
 
-## 14. Mobile-First Architecture Path
+## 15. Mobile-First Architecture Path
 
 Current web app is the mobile simulation and API proving ground.
 
@@ -284,7 +355,7 @@ Mobile-readiness requirements:
 
 ---
 
-## 15. Integrations
+## 16. Integrations
 
 MVP-priority integrations:
 - Extraction/fetch infrastructure
@@ -298,7 +369,7 @@ Near-future integrations:
 
 ---
 
-## 16. Security and Trust
+## 17. Security and Trust
 
 1. Data minimization for in-app tracking.
 2. Explicit user controls for reminders/tracking.
@@ -308,7 +379,7 @@ Near-future integrations:
 
 ---
 
-## 17. Edge Cases and Failure Modes
+## 18. Edge Cases and Failure Modes
 
 1. Invalid or dead URL
 2. JS-heavy pages with weak static extraction
@@ -328,7 +399,7 @@ Handling principles:
 
 ---
 
-## 18. MVP Success Metrics
+## 19. MVP Success Metrics
 
 1. Link-to-structured-record success rate
 2. Extraction accuracy on critical fields
@@ -340,34 +411,60 @@ Handling principles:
 
 ---
 
-## 19. Development Stages
+## 20. Development Stages
 
-### Stage A: Foundation
-- Domain schema
-- Application APIs
+### Stage 1: Foundation
+- Domain schema (Application, ApplicationStage, Reminder, etc.)
+- Application CRUD APIs
 - Ingestion jobs/statuses
+- Dashboard wiring to live data
 
-### Stage B: Tracking Core
-- Stage eventing
-- Reminder rules
-- Notification center
+### Stage 2: Tracking Core
+- Stage eventing and history
+- Reminder rules and defaults
+- Notification center (in-app + email)
+- Completion tracking pipeline
 
-### Stage C: In-App Engagement
+### Stage 3: In-App Engagement
 - In-app browser shell
-- Passive telemetry
-- Completion checkpoint loop
+- Passive telemetry (session, interaction, completion)
+- Checkpoint-based reminders
+- External fallback handling
 
-### Stage D: Discover Intelligence
-- Ranking baseline
-- Source quality and dedupe
+### Stage 4: Discover Intelligence (Low Priority MVP)
+- Link deduplication at canonical URL level
+- Discover feed basic ranking (freshness, deadline, user relevance)
+- User-pasted link aggregation and indexing
+- Basic opportunity search and filtering
 
-### Stage E: AI Enhancement
-- Richer coaching
+### Stage 5: AI Enhancement
+- Richer summarization and extraction
+- Stage-specific coaching
 - Policy-based automation preparation
+
+### Stage 6: Mobile and Deep Links
+- Mobile native app scaffolding
+- Share-target and clipboard integration
+- Deep link contract for opportunity routing
+
+### Stage 7: Mentorship Discovery (Future Growth)
+- User profile expansion for mentoring
+- Mentor-mentee matching
+- Social capital network graph
+
+### Stage 8: Weak-Tie Bridging (Future Growth)
+- Connection discovery and introduction facilitation
+- Weak-tie relevance scoring
+- Social proof and success stories
+
+### Stage 9+: Community Intelligence (Future Growth)
+- Opportunity recommendations from similar users
+- Peer feedback and collaboration
+- Collective intelligence features
 
 ---
 
-## 20. Sprint Ticket Structure (Template)
+## 21. Sprint Ticket Structure (Template)
 
 Every ticket must define:
 - objective
@@ -380,7 +477,7 @@ Every ticket must define:
 
 ---
 
-## 21. Revenue and Expansion
+## 22. Revenue and Expansion
 
 Current strategy:
 - Focus on high-value execution and retention.
@@ -393,7 +490,7 @@ Future monetization options:
 
 ---
 
-## 22. Hard Constraints
+## 23. Hard Constraints
 
 1. Never hide uncertainty in extracted data.
 2. Never spam reminders when user opted out.
@@ -403,7 +500,7 @@ Future monetization options:
 
 ---
 
-## 23. Governance and Ownership
+## 24. Governance and Ownership
 
 Internal stakeholders:
 - Backend: Dotun
@@ -415,7 +512,7 @@ Operating rule:
 
 ---
 
-## 24. Immediate Next Build Targets
+## 25. Immediate Next Build Targets
 
 1. Add domain Prisma models and migrations.
 2. Build link ingestion job pipeline.
@@ -426,7 +523,14 @@ Operating rule:
 
 ---
 
-## 25. Changelog
+## 26. Changelog
+
+Version 1.1
+- Added Discover Page framework with user-pasted links as primary data source (low-priority MVP).
+- Added Social Capital and Weak-Tie Bridging as future growth areas (Stages 7-9+).
+- Incorporated research finding: 73% of people land opportunities through personal connections.
+- Expanded Development Stages from 5 to 9+ with clear MVP vs. future boundaries.
+- Clarified discovery architecture to bootstrap with community links before external sources.
 
 Version 1.0
 - Initial master reference aligned with raw business model and current repository state.
