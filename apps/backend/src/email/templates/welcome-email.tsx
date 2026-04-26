@@ -3,11 +3,11 @@ import { Text, Button, Section } from '@react-email/components';
 import { BaseLayout, BRAND } from './base-layout.js';
 
 interface WelcomeEmailProps {
-  name?: string;
+  username?: string;
 }
 
-export function WelcomeEmail({ name }: WelcomeEmailProps) {
-  const safeName = name?.trim() || 'there';
+export function WelcomeEmail({ username }: WelcomeEmailProps) {
+  const safeName = username?.trim() || 'there';
 
   return (
     <BaseLayout preview={`Welcome to ApplyLater, ${safeName}!`}>

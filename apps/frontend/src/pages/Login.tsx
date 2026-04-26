@@ -1,35 +1,50 @@
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, KeyRound } from "lucide-react";
+ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { useState } from "react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@/features/auth/auth-provider";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useToast } from "@/hooks/use-toast";
+
+const loginSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
   const { login, googleSignIn } = useAuth();
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "" });
 
-  const onSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const form = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+    mode: "onTouched",
+  });
+
+  const onSubmit: SubmitHandler<LoginValues> = async (values) => {
     try {
-      setIsSubmitting(true);
-      await login(form);
+      await login({ email: values.email!, password: values.password! });
       navigate("/dashboard");
-    } catch {
-      toast({
-        title: "Login failed",
-        description: "Check your credentials and email verification status.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        toast({
+          title: "Email not verified",
+          description: "Please check your inbox and verify your email first.",
+          variant: "destructive",
+        });
+      } else {
+        form.setError("root", { message: "Invalid email or password" });
+      }
     }
   };
 
@@ -56,36 +71,48 @@ export default function Login() {
             <h2 className="font-display text-3xl font-semibold">Login to your account</h2>
             <p className="mt-1 text-sm text-muted-foreground">Continue where you left off.</p>
 
-            <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Email address</label>
-                <Input
-                  type="email"
-                  required
-                  placeholder="you@example.com"
-                  className="h-11 rounded-xl"
-                  value={form.email}
-                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+            <Form {...form}>
+              <form className="mt-6 space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email address</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="you@example.com" className="h-11 rounded-xl" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label className="block text-sm font-medium">Password</label>
-                  <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
-                </div>
-                <PasswordInput
-                  required
-                  placeholder="Enter your password"
-                  className="h-11 rounded-xl"
-                  value={form.password}
-                  onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+                      </div>
+                      <FormControl>
+                        <PasswordInput placeholder="Enter your password" className="h-11 rounded-xl" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
-                {isSubmitting ? "Logging in..." : "Login"}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </form>
+                {form.formState.errors.root && (
+                  <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {form.formState.errors.root.message}
+                  </p>
+                )}
+                <Button type="submit" className="h-11 w-full rounded-xl" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? "Logging in..." : "Login"}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </form>
+            </Form>
 
             <div className="my-5 flex items-center gap-3">
               <span className="h-px flex-1 bg-border" />

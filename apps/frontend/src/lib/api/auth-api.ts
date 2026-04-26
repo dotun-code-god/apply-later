@@ -3,7 +3,7 @@ import { apiClient } from './client';
 export interface AuthUser {
   id: number;
   email: string;
-  name: string | null;
+  username: string | null;
   role: string;
   emailVerified: boolean;
 }
@@ -20,7 +20,7 @@ export const authApi = {
     return data;
   },
 
-  async signup(payload: { email: string; password: string; name?: string }) {
+  async signup(payload: { email: string; password: string; username?: string }) {
     const { data } = await apiClient.post<AuthResponse>('/auth/signup', payload);
     return data;
   },

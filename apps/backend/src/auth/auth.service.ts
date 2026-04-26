@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
@@ -16,6 +17,7 @@ import * as argon2 from 'argon2';
 import { EmailService } from '@/email/email.service';
 import { GoogleIdentityDto } from '@/auth/dto/google-identity.dto';
 import { OAuth2Client } from 'google-auth-library';
+import { Prisma } from '@prisma/client';
 
 interface RequestMeta {
   userAgent?: string;
@@ -155,14 +157,14 @@ export class AuthService {
   private sanitizeUser(user: {
     id: number;
     email: string;
-    name: string | null;
+    username: string | null;
     role: string;
     emailVerifiedAt: Date | null;
   }) {
     return {
       id: user.id,
       email: user.email,
-      name: user.name,
+      username: user.username,
       role: user.role,
       emailVerified: !!user.emailVerifiedAt,
     };
@@ -174,7 +176,7 @@ export class AuthService {
       email: string;
       role: string;
       tokenVersion: number;
-      name: string | null;
+      username: string | null;
       emailVerifiedAt: Date | null;
     },
     meta?: RequestMeta,
@@ -201,25 +203,37 @@ export class AuthService {
 
     const passwordHash = await argon2.hash(dto.password);
 
-    const user =
-      existing == null
-        ? await this.prisma.user.create({
-            data: {
-              email,
-              name: dto.name?.trim() || null,
-              passwordHash,
-            },
-          })
-        : await this.prisma.user.update({
-            where: { id: existing.id },
-            data: {
-              name: dto.name?.trim() || existing.name,
-              passwordHash,
-            },
-          });
+    let user: Awaited<ReturnType<typeof this.prisma.user.create>>;
+    try {
+      user =
+        existing == null
+          ? await this.prisma.user.create({
+              data: {
+                email,
+                username: dto.username?.trim() || null,
+                passwordHash,
+              },
+            })
+          : await this.prisma.user.update({
+              where: { id: existing.id },
+              data: {
+                username: dto.username?.trim() || existing.username,
+                passwordHash,
+              },
+            });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const fields = e.meta?.target as string[] | undefined;
+        if (fields?.includes('username')) {
+          throw new ConflictException('Username is already taken');
+        }
+        throw new ConflictException('An account with this information already exists');
+      }
+      throw e;
+    }
 
     await this.createEmailVerificationToken(user.id, user.email);
-    await this.emailService.sendWelcomeEmail(user.email, user.name ?? undefined);
+    await this.emailService.sendWelcomeEmail(user.email, user.username ?? undefined);
 
     return this.issueAuthTokens(user, meta);
   }
@@ -477,7 +491,7 @@ export class AuthService {
       ? await this.prisma.user.create({
           data: {
             email,
-            name: profile.name ?? null,
+            username: profile.name ?? null,
             googleId: profile.googleId,
             emailVerifiedAt: new Date(),
           },
@@ -486,13 +500,13 @@ export class AuthService {
           where: { id: existing.id },
           data: {
             googleId: profile.googleId,
-            name: existing.name ?? profile.name ?? null,
+            username: existing.username ?? profile.name ?? null,
             emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
           },
         });
 
     if (isNew) {
-      void this.emailService.sendWelcomeEmail(user.email, user.name ?? undefined);
+      void this.emailService.sendWelcomeEmail(user.email, user.username ?? undefined);
     }
 
     return this.issueAuthTokens(user, meta);

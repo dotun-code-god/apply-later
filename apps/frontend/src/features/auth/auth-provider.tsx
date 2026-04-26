@@ -7,7 +7,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (payload: { email: string; password: string }) => Promise<void>;
-  signup: (payload: { email: string; password: string; name?: string }) => Promise<void>;
+  signup: (payload: { email: string; password: string; username?: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   googleSignIn: (credential: string) => Promise<void>;
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(response.user);
   };
 
-  const signup = async (payload: { email: string; password: string; name?: string }) => {
+  const signup = async (payload: { email: string; password: string; username?: string }) => {
     const response = await authApi.signup(payload);
     tokenStore.setAccessToken(response.accessToken);
     setUser(response.user);

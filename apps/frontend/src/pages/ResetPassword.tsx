@@ -1,55 +1,58 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { KeyRound } from 'lucide-react';
+import { Check, KeyRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PasswordInput } from '@/components/ui/password-input';
-import { useState } from 'react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm, type SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { authApi } from '@/lib/api/auth-api';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+const resetSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .max(128, 'Password is too long'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+type ResetValues = z.infer<typeof resetSchema>;
 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const token = searchParams.get('token') ?? '';
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const onSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const form = useForm<ResetValues>({
+    resolver: zodResolver(resetSchema),
+    defaultValues: { password: '', confirmPassword: '' },
+    mode: 'onTouched',
+  });
 
+  const password = form.watch('password');
+  const confirmPassword = form.watch('confirmPassword');
+  const confirmTouched = !!form.formState.touchedFields.confirmPassword;
+
+  const onSubmit: SubmitHandler<ResetValues> = async (values) => {
     if (!token) {
-      toast({
-        title: 'Invalid reset link',
-        description: 'Missing reset token.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid reset link', description: 'Missing reset token.', variant: 'destructive' });
       return;
     }
-
-    if (password !== confirmPassword) {
-      toast({
-        title: 'Password mismatch',
-        description: 'Passwords must match.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
-      setIsSubmitting(true);
-      await authApi.resetPassword(token, password);
+      await authApi.resetPassword(token, values.password);
       toast({ title: 'Password reset successful', description: 'Please log in with your new password.' });
       navigate('/login');
     } catch {
-      toast({
-        title: 'Reset failed',
-        description: 'Reset token may be invalid or expired.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
+      form.setError('root', { message: 'Reset token may be invalid or expired.' });
     }
   };
 
@@ -59,20 +62,62 @@ export default function ResetPassword() {
         <h1 className="font-display text-3xl font-semibold">Reset password</h1>
         <p className="mt-1 text-sm text-muted-foreground">Choose a new password for your account.</p>
 
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">New password</label>
-            <PasswordInput required minLength={8} className="h-11 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Confirm password</label>
-            <PasswordInput required minLength={8} className="h-11 rounded-xl" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-          </div>
-          <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
-            <KeyRound className="h-4 w-4" />
-            {isSubmitting ? 'Updating...' : 'Update password'}
-          </Button>
-        </form>
+        <Form {...form}>
+          <form className="mt-6 space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New password</FormLabel>
+                  <FormControl>
+                    <PasswordInput placeholder="At least 8 characters" className="h-11 rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm password</FormLabel>
+                  <FormControl>
+                    <PasswordInput placeholder="Repeat your password" className="h-11 rounded-xl" {...field} />
+                  </FormControl>
+                  {confirmTouched && confirmPassword && (
+                    <p
+                      className={cn(
+                        'flex items-center gap-1 text-xs',
+                        confirmPassword === password
+                          ? 'text-green-600 dark:text-green-500'
+                          : 'text-destructive',
+                      )}
+                    >
+                      {confirmPassword === password ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
+                      {confirmPassword === password ? 'Passwords match' : 'Passwords do not match'}
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {form.formState.errors.root && (
+              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {form.formState.errors.root.message}
+              </p>
+            )}
+            <Button type="submit" className="h-11 w-full rounded-xl" disabled={form.formState.isSubmitting}>
+              <KeyRound className="h-4 w-4" />
+              {form.formState.isSubmitting ? 'Updating...' : 'Update password'}
+            </Button>
+          </form>
+        </Form>
 
         <p className="mt-5 text-sm text-muted-foreground">
           Back to <Link to="/login" className="font-medium text-primary hover:underline">Login</Link>

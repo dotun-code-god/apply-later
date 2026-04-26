@@ -42,8 +42,8 @@ export class EmailService {
     }
   }
 
-  async sendWelcomeEmail(to: string, name?: string): Promise<void> {
-    const html = await render(React.createElement(WelcomeEmail, { name }));
+  async sendWelcomeEmail(to: string, username?: string): Promise<void> {
+    const html = await render(React.createElement(WelcomeEmail, { username }));
     await this.sendMail(to, 'Welcome to ApplyLater 🎉', html);
   }
 

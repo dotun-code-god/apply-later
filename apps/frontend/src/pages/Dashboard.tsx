@@ -67,7 +67,7 @@ export default function Dashboard() {
 
             <div className="mt-auto rounded-2xl border border-border/70 bg-card p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Signed in as</p>
-              <p className="mt-1 font-medium">{user?.name ?? user?.email ?? 'User'}</p>
+              <p className="mt-1 font-medium">{user?.username ?? user?.email ?? 'User'}</p>
               <Button
                 variant="outline"
                 className="mt-3 w-full justify-start rounded-xl"

@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength, Matches } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -11,6 +11,8 @@ export class SignupDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(120)
-  name?: string;
+  @MinLength(3)
+  @MaxLength(30)
+  @Matches(/^[a-zA-Z0-9_]+$/, { message: 'Username may only contain letters, numbers, and underscores' })
+  username?: string;
 }
