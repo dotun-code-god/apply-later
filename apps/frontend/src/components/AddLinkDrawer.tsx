@@ -31,12 +31,9 @@ export function AddLinkDrawer({ isOpen, onClose, onSubmit }: AddLinkDrawerProps)
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!url.trim()) return;
-    
     setIsProcessing(true);
-    // Simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1500));
     onSubmit(url);
     setUrl("");
     setIsProcessing(false);

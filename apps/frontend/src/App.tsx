@@ -15,6 +15,11 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import ApplicationDetails from "./pages/ApplicationDetails";
+import Alerts from "./pages/Alerts";
+import Search from "./pages/Search";
+import Profile from "./pages/Profile";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +43,11 @@ const App = () => (
               <Route element={<VerifiedRoute />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/applications/:id" element={<ApplicationDetails />} />
+                <Route path="/alerts" element={<Alerts />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/onboarding" element={<Onboarding />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

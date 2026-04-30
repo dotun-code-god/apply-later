@@ -14,11 +14,9 @@ export function AddLinkModal({ isOpen, onClose, onSubmit }: AddLinkModalProps) {
   const [url, setUrl] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!url.trim()) return;
     setIsProcessing(true);
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
     onSubmit(url);
     setUrl("");
     setIsProcessing(false);

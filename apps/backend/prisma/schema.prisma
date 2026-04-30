@@ -11,6 +11,60 @@ enum Role {
   ADMIN
 }
 
+enum IngestionJobStatus {
+  PENDING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+}
+
+enum ApplicationStage {
+  ADDED
+  REVIEWING
+  PREPARING_DOCS
+  IN_PROGRESS
+  SUBMITTED
+  UNDER_REVIEW
+  INTERVIEW
+  OFFER
+  REJECTED
+  CLOSED
+  PARKED
+}
+
+enum ReminderChannel {
+  IN_APP
+  EMAIL
+}
+
+enum ReminderRuleScope {
+  GLOBAL
+  APPLICATION
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum NotificationEventType {
+  INGESTION_COMPLETED
+  INGESTION_PARTIALLY_COMPLETED
+  INGESTION_FAILED
+  REMINDER_TRIGGERED
+  APPLICATION_STATUS_CHANGED
+}
+
+enum ApplicationActivityEventType {
+  SESSION_START
+  PAGE_CHANGE
+  INTERACTION_CHECKPOINT
+  SESSION_END
+  COMPLETION_PROMPT_RESPONSE
+}
+
 model User {
   id                Int                      @id @default(autoincrement())
   email             String                   @unique
@@ -23,8 +77,219 @@ model User {
   refreshTokens     RefreshToken[]
   emailTokens       EmailVerificationToken[]
   passwordResetLogs PasswordResetToken[]
+  opportunities     Opportunity[]            @relation("OpportunityCreator")
+  applications      Application[]
+  reminderRules     ReminderRule[]
+  reminders         Reminder[]
+  ingestionJobs     IngestionJob[]
+  activityEvents    ApplicationActivityEvent[]
+  notificationEvents NotificationEvent[]
+  submissionArtifacts SubmissionArtifact[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
+}
+
+model Opportunity {
+  id                   String             @id @default(cuid())
+  canonicalUrl         String             @unique
+  normalizedSourceUrl  String
+  sourceUrl            String
+  applicationUrl       String?
+  title                String?
+  organizationName     String?
+  category             String?
+  location             String?
+  amount               String?
+  summary              String?
+  description          String?
+  openDate             DateTime?
+  deadline             DateTime?
+  responseDate         DateTime?
+  currentStatus        String?
+  confidenceScore      Float?
+  needsUserReview      Boolean            @default(false)
+  createdByUserId      Int?
+  createdBy            User?              @relation("OpportunityCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  applications         Application[]
+  ingestionJobs        IngestionJob[]
+  extractionResults    ExtractionResult[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([createdByUserId])
+  @@index([deadline])
+}
+
+model Application {
+  id                   String                    @id @default(cuid())
+  userId               Int
+  opportunityId        String
+  sourceUrl            String
+  canonicalUrl         String
+  titleOverride        String?
+  notes                String?
+  archivedAt           DateTime?
+  lastViewedAt         DateTime?
+  customReminderMuted  Boolean                   @default(false)
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunity          Opportunity               @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  stageEvents          ApplicationStageEvent[]
+  reminderRules        ReminderRule[]
+  reminders            Reminder[]
+  activityEvents       ApplicationActivityEvent[]
+  submissionArtifacts  SubmissionArtifact[]
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  @@unique([userId, opportunityId])
+  @@index([userId, createdAt])
+  @@index([opportunityId])
+}
+
+model ApplicationStageEvent {
+  id             String            @id @default(cuid())
+  applicationId  String
+  stage          ApplicationStage
+  note           String?
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  application    Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+}
+
+model ReminderRule {
+  id                 String             @id @default(cuid())
+  userId             Int
+  applicationId      String?
+  scope              ReminderRuleScope
+  channel            ReminderChannel    @default(IN_APP)
+  offsetMinutes      Int?
+  sendAt             DateTime?
+  isEnabled          Boolean            @default(true)
+  muteAll            Boolean            @default(false)
+  metadata           Json?
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application        Application?       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reminders          Reminder[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([userId, scope])
+  @@index([applicationId])
+}
+
+model Reminder {
+  id                 String           @id @default(cuid())
+  userId             Int
+  applicationId      String?
+  reminderRuleId     String?
+  channel            ReminderChannel  @default(IN_APP)
+  scheduledFor       DateTime
+  status             ReminderStatus   @default(PENDING)
+  content            String?
+  metadata           Json?
+  sentAt             DateTime?
+  cancelledAt        DateTime?
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application        Application?     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reminderRule       ReminderRule?    @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([userId, status, scheduledFor])
+  @@index([applicationId])
+}
+
+model IngestionJob {
+  id                   String                @id @default(cuid())
+  userId               Int
+  opportunityId        String?
+  sourceUrl            String
+  normalizedSourceUrl  String
+  canonicalUrl         String
+  status               IngestionJobStatus    @default(PENDING)
+  errorMessage         String?
+  mode                 String?
+  metadata             Json?
+  completedAt          DateTime?
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunity          Opportunity?          @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  extractionResults    ExtractionResult[]
+  notificationEvents   NotificationEvent[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([canonicalUrl])
+}
+
+model ExtractionResult {
+  id                  String         @id @default(cuid())
+  ingestionJobId      String
+  opportunityId       String?
+  provider            String?
+  extractionMethod    String?
+  confidenceScore     Float?
+  needsUserReview     Boolean        @default(false)
+  payload             Json?
+  evidence            Json?
+  ingestionJob        IngestionJob   @relation(fields: [ingestionJobId], references: [id], onDelete: Cascade)
+  opportunity         Opportunity?   @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now())
+
+  @@index([ingestionJobId, createdAt])
+  @@index([opportunityId])
+}
+
+model ApplicationActivityEvent {
+  id                String                       @id @default(cuid())
+  userId            Int
+  applicationId     String
+  type              ApplicationActivityEventType
+  metadata          Json?
+  occurredAt        DateTime                     @default(now())
+  user              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application       Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, occurredAt])
+  @@index([userId, occurredAt])
+}
+
+model NotificationEvent {
+  id                String                @id @default(cuid())
+  userId            Int
+  ingestionJobId    String?
+  type              NotificationEventType
+  title             String
+  body              String?
+  metadata          Json?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ingestionJob      IngestionJob?         @relation(fields: [ingestionJobId], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+
+  @@index([userId, createdAt])
+  @@index([ingestionJobId])
+}
+
+model SubmissionArtifact {
+  id                String        @id @default(cuid())
+  userId            Int
+  applicationId     String
+  kind              String
+  name              String
+  url               String?
+  metadata          Json?
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application       Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([applicationId, createdAt])
+  @@index([userId])
 }
 
 model RefreshToken {

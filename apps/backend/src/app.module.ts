@@ -8,6 +8,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from '@/auth/auth.module';
 import { RolesGuard } from '@/common/guards/roles.guard';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { ApplicationsModule } from '@/applications/applications.module';
+import { DashboardModule } from '@/dashboard/dashboard.module';
+import { IngestionJobsModule } from '@/ingestion-jobs/ingestion-jobs.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     ]),
     PrismaModule,
     AuthModule,
+    ApplicationsModule,
+    DashboardModule,
+    IngestionJobsModule,
   ],
   controllers: [AppController],
   providers: [
