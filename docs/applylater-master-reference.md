@@ -620,6 +620,35 @@ Guardrails:
 - User remains decision-maker.
 - No silent submission without explicit policy permission.
 
+### Recommended AI Agent and Orchestration Strategy
+
+Primary recommendation for ApplyLater:
+- Use Claude Agent SDK as the current main orchestration stack (planner + tool router + quality gate), with provider-agnostic interfaces so we can pivot later.
+
+Why this is the recommended default:
+- Strong agentic workflow support for multi-step tool orchestration (fetch, classify, traverse, normalize, validate).
+- Good fit for long-running extraction tasks that need iterative tool calls and reasoning loops.
+- Works well for structured, policy-constrained pipelines when paired with strict schema validation.
+- Supports our near-term need to ship fast while keeping a clear migration path.
+
+Execution pattern (long-term):
+- Primary Orchestrator Agent (Claude Agent SDK): plans steps, selects tools, enforces guardrails, returns final payload.
+- Extraction Worker Agent: page traversal and evidence capture (read-only, no form mutation).
+- Normalization Agent: maps raw findings to Section 11 output schema with confidence scoring.
+- QA/Verifier Agent: checks consistency, timezone/deadline conflicts, and low-confidence flags before persistence.
+
+Model policy:
+- Production default: Claude Agent SDK as orchestration layer.
+- Provider abstraction: all model calls pass through a model gateway interface (no provider-specific logic in domain services).
+- Cost-optimized path: smaller model tier for simple transformations or non-critical copy edits.
+- Fallback path: automatic retry/escalation to a higher-capability model when confidence or validation fails.
+- Pivot readiness: maintain contract tests for tool-calling behavior and structured output so provider swap is low risk.
+
+Non-negotiable constraints for all agents:
+- Read-only traversal for extraction.
+- Explicit confidence and uncertainty exposure.
+- No autonomous submission or destructive actions without policy-gated user approval.
+
 ---
 
 ## 20. Mobile-First Architecture Path
@@ -693,54 +722,225 @@ Handling principles:
 
 ## 25. Development Stages
 
-### Stage 1: Foundation
-- Domain schema (Application, ApplicationStage, Reminder, etc.)
-- Application CRUD APIs
-- Ingestion jobs/statuses
-- Dashboard wiring to live data
+This section is the implementation execution map and release gate reference.
 
-### Stage 2: Tracking Core
-- Stage eventing and history
-- Reminder rules and defaults
-- Notification center (in-app + email)
-- Completion tracking pipeline
+How to use this section:
+- A stage is only considered complete when all listed outputs and acceptance gates are met.
+- Hard Constraints (Section 28) and Security and Trust rules (Section 22) apply to all stages.
+- Any stage that introduces reminders, extraction, or AI must expose uncertainty and confidence signals.
 
-### Stage 3: In-App Engagement
-- In-app browser shell
-- Passive telemetry (session, interaction, completion)
-- Checkpoint-based reminders
-- External fallback handling
+### Stage 1: Foundation (MVP Critical)
 
-### Stage 4: Discover Intelligence (Low Priority MVP)
-- Link deduplication at canonical URL level
-- Discover feed basic ranking (freshness, deadline, user relevance)
-- User-pasted link aggregation and indexing
-- Basic opportunity search and filtering
+Objective:
+- Establish canonical domain, ingestion lifecycle, and live Home experience backed by real APIs.
 
-### Stage 5: AI Enhancement
-- Richer summarization and extraction
-- Stage-specific coaching
-- Policy-based automation preparation
+Primary outputs:
+- Prisma schema and migrations for MVP entities in Section 8:
+   - `opportunities`, `applications`, `application_stage_events`, `reminder_rules`, `reminders`, `ingestion_jobs`, `extraction_results`, `application_activity_events`, `notification_events`, `submission_artifacts`
+- Canonical URL normalization and deduplication primitives for ingestion.
+- Application CRUD endpoints and validation contracts.
+- Ingestion job lifecycle with statuses: `Pending`, `Completed`, `PartiallyCompleted`, `Failed`.
+- Home screen APIs wired to live data:
+   - analytics strip
+   - filter labels
+   - application list row payload including applicant count
 
-### Stage 6: Mobile and Deep Links
-- Mobile native app scaffolding
-- Share-target and clipboard integration
-- Deep link contract for opportunity routing
+Minimum API contract surface:
+- `POST /applications/intake-link`
+- `GET /applications`
+- `GET /applications/:id`
+- `PATCH /applications/:id`
+- `GET /dashboard/summary`
+- `GET /ingestion-jobs/:id`
 
-### Stage 7: Mentorship Discovery (Future Growth)
-- User profile expansion for mentoring
-- Mentor-mentee matching
-- Social capital network graph
+Acceptance gates:
+- User can submit URL and receive job ID immediately (async, non-blocking UI).
+- Dashboard no longer depends on mocks for primary list and analytics strip.
+- Stage history is append-only and never overwritten destructively.
+- Duplicate/canonical URL handling prevents duplicate opportunity creation for obvious URL variants.
 
-### Stage 8: Weak-Tie Bridging (Future Growth)
-- Connection discovery and introduction facilitation
-- Weak-tie relevance scoring
-- Social proof and success stories
+### Stage 2: Extraction + Intelligence Core (MVP Critical)
 
-### Stage 9+: Community Intelligence (Future Growth)
-- Opportunity recommendations from similar users
-- Peer feedback and collaboration
-- Collective intelligence features
+Objective:
+- Deliver reliable URL-to-structured-application pipeline across overview and direct form links.
+
+Primary outputs:
+- Layered extraction architecture (Section 10):
+   - Firecrawl default path
+   - Playwright escalation path
+   - AI orchestration layer with traversal and normalization
+- Two-link-type support (Section 9):
+   - overview/description pages
+   - direct application form pages
+- Structured intelligence output (Section 11) persisted and queryable:
+   - Core Identity, Overview, Eligibility/Requirements, Timelines, AI Guidance, Metadata
+- Confidence framework:
+   - per-field confidence
+   - source evidence
+   - `needsUserReview` behavior for critical low-confidence fields
+- Stay/Leave extraction completion behavior from end-to-end workflow (Section 6).
+
+Non-negotiable boundaries:
+- Extraction agent is read-only and never submits or modifies forms.
+- Long-running jobs degrade gracefully and return partial results with explicit confidence warnings.
+
+Acceptance gates:
+- Pipeline completes end-to-end for both link types and creates linked opportunity + application records.
+- Details page receives real intelligence payload including AI guidance fields.
+- Low-confidence fields are explicitly flagged and never shown as certain.
+
+### Stage 3: Tracking Core + Reminders (MVP Critical)
+
+Objective:
+- Turn saved applications into active completion workflows.
+
+Primary outputs:
+- Stage eventing and projection pipeline for stage model in Section 8.
+- Global reminder defaults and per-application override controls.
+- Custom reminder on the spot (at extraction completion and first details visit).
+- Reminder triggers from Section 15:
+   - deadline proximity
+   - inactivity
+   - missing required documents
+   - response-date follow-up
+   - applicant-count thresholds
+- Notification center + delivery channels:
+   - in-app first
+   - email second
+
+Tracking pipeline implementation:
+- `ApplicationStarted` on Apply action.
+- Check at 30 minutes, then exponential backoff (30m, 1h, 2h, 4h...).
+- "Don't ask again" termination path.
+- `ApplicationCompleted` + Parked transition rules.
+
+Acceptance gates:
+- Reminder rules are user-controllable globally and per application.
+- User can mute a single application without disabling all reminders.
+- Pipeline schedules and cancels follow-ups correctly based on stage changes.
+
+### Stage 4: In-App Application Engagement (MVP Critical)
+
+Objective:
+- Capture application engagement safely while preserving privacy and reliability.
+
+Primary outputs:
+- In-app browser shell with external fallback when blocked.
+- Passive telemetry only, with no sensitive form value capture.
+- Required event coverage (Section 16):
+   - `session_start`
+   - `page_change`
+   - `interaction_checkpoint`
+   - `session_end`
+   - `completion_prompt_response`
+- Completion prompt UX integrated with tracking state transitions.
+
+Acceptance gates:
+- Engagement events are reliably recorded for in-app and fallback paths.
+- Blocking or unsupported sites degrade to external mode without breaking tracking flow.
+- Data minimization requirements remain enforced.
+
+### Stage 5: Discover Intelligence Baseline (Low Priority MVP)
+
+Objective:
+- Activate community-powered opportunity discovery without delaying execution core.
+
+Primary outputs:
+- Shared opportunity index fed by user-pasted links.
+- Canonical deduplication and applicant-count aggregation by opportunity.
+- Discover feed APIs with baseline ranking factors (Section 17):
+   - relevance
+   - deadline urgency
+   - freshness
+   - extraction confidence quality
+   - engagement signals
+- Basic discover search and filtering.
+
+Acceptance gates:
+- Discover surfaces high-confidence deduplicated opportunities.
+- Feed ranking is deterministic, testable, and configurable.
+- Discover does not regress Home/Details performance or extraction throughput.
+
+### Stage 6: AI Quality + Coaching Expansion (Late MVP / Early Growth)
+
+Objective:
+- Improve decision quality and completion outcomes using contextual AI guidance.
+
+Primary outputs:
+- Improved extraction quality and robustness for difficult sources.
+- Better AI-generated guidance quality for:
+   - `whatMakesAGoodApplication`
+   - `caveats`
+   - `keyHighlights`
+- Stage-specific coaching and checklist generation using user/application context.
+- Policy scaffolding for future approval-gated automation (no autonomous submission).
+
+Acceptance gates:
+- Guidance quality and extraction accuracy improve against MVP success metrics.
+- Guardrails are preserved: advisory AI only, explicit user control, no silent actions.
+
+### Stage 7: Mobile and Deep-Link Contracts
+
+Objective:
+- Move from web proving ground to production mobile integration contracts.
+
+Primary outputs:
+- Mobile app scaffolding and environment contracts (Section 20):
+   - share-target
+   - clipboard intake
+   - notification payloads
+   - deep-link routing
+   - polling/job-status handling
+- Contract tests between backend and mobile clients.
+
+Acceptance gates:
+- A shared link from mobile can create and track ingestion jobs end to end.
+- Notification tap routes directly to correct application/details context.
+
+### Stage 8: Mentorship Discovery (Future Growth)
+
+Objective:
+- Introduce opt-in social capital features focused on mentorship outcomes.
+
+Primary outputs:
+- Expanded user profile model for mentoring context.
+- Mentor matching and request/accept workflow.
+- Mentor check-in and goal reminder primitives.
+
+Acceptance gates:
+- Mentorship flows are opt-in and privacy-preserving.
+- Social surfaces do not expose private application history by default.
+
+### Stage 9: Weak-Tie Bridging + Community Intelligence (Future Growth)
+
+Objective:
+- Build network effects through connection relevance and shared success signals.
+
+Primary outputs:
+- Weak-tie discovery and introduction facilitation.
+- Opportunity recommendations informed by similar-user outcomes.
+- Peer feedback and collective curation signals.
+- Trust, abuse, and anti-spam controls for social workflows.
+
+Acceptance gates:
+- Social relevance models are explainable enough for user trust.
+- Abuse controls and opt-out mechanisms are in place before broad rollout.
+
+### Cross-Stage Release Controls (Applies to Every Stage)
+
+- Observability:
+   - stage-specific logs, metrics, and failure alerts
+   - ingestion latency, extraction quality, reminder delivery, and conversion funnel monitoring
+- Idempotency and retries:
+   - safe retry semantics for ingestion, reminder scheduling, and notifications
+- Performance and cost controls:
+   - queue-based async workloads
+   - extraction traversal limits and token budgets
+   - Playwright escalation only when needed
+- Quality gates:
+   - unit + integration tests for new domain logic
+   - contract tests for API payloads consumed by frontend/mobile
+   - rollback strategy defined per sprint ticket (Section 26)
 
 ---
 
@@ -804,6 +1004,22 @@ Operating rule:
 ---
 
 ## 31. Changelog
+
+Version 1.5
+- Updated Section 19 recommendation to use Claude Agent SDK as the current orchestration default.
+- Added provider-agnostic model gateway guidance to preserve pivot flexibility.
+- Added pivot-readiness requirement via contract tests for tool-calling and structured outputs.
+
+Version 1.4
+- Added explicit AI agent recommendation and orchestration strategy under Section 19.
+- Chose a GPT-5-class orchestration agent as default, with cost-optimized and fallback model policy.
+- Defined long-term multi-agent operating pattern (orchestrator, extraction worker, normalization, verifier).
+
+Version 1.3
+- Expanded Section 25 (Development Stages) into an execution-grade implementation map.
+- Added stage objectives, required outputs, API/data expectations, acceptance gates, and cross-stage release controls.
+- Mapped stage delivery explicitly to extraction architecture, intelligence output schema, reminder/tracking engine, telemetry, discover baseline, mobile contracts, and future social roadmap.
+- Clarified that Section 25 is the implementation execution and release gate reference.
 
 Version 1.2
 - Defined Extraction Engine Architecture (Section 10): Firecrawl + Playwright + AI Agent with tool use.
