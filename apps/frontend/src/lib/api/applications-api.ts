@@ -247,6 +247,11 @@ export const applicationsApi = {
     return data;
   },
 
+  async refreshById(id: string): Promise<IntakeLinkResponse> {
+    const { data } = await apiClient.post<IntakeLinkResponse>(`/applications/${id}/refresh`);
+    return data;
+  },
+
   async update(id: string, payload: UpdateApplicationPayload): Promise<ApplicationDetail> {
     const { data } = await apiClient.patch<ApplicationDetail>(`/applications/${id}`, payload);
     return data;

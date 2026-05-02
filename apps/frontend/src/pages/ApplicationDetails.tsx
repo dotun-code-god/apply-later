@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
   Loader2,
   MapPin,
   Paperclip,
+  RefreshCw,
   ShieldAlert,
   Sparkles,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
+  ingestionJobsApi,
   applicationsApi,
   type ApplicationDetail,
   type ApplicationStage,
@@ -97,24 +99,82 @@ export default function ApplicationDetails() {
 
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const loadApplication = useCallback(async (mode: "initial" | "refresh", hasData = false) => {
     if (!id) return;
-    setLoading(true);
+
+    const showPageLoading = mode === "initial" || (mode === "refresh" && !hasData);
+
+    if (showPageLoading) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     setError(false);
-    applicationsApi
-      .getById(id)
-      .then(setApp)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+
+    try {
+      const data = await applicationsApi.getById(id);
+      setApp(data);
+    } catch {
+      if (!hasData) {
+        setError(true);
+      }
+    } finally {
+      if (showPageLoading) {
+        setLoading(false);
+      } else {
+        setRefreshing(false);
+      }
+    }
   }, [id]);
+
+  useEffect(() => {
+    void loadApplication("initial", false);
+  }, [loadApplication]);
+
+  const refreshFromSource = useCallback(async () => {
+    if (!id) return;
+
+    setError(false);
+    setLoading(true);
+    setRefreshing(true);
+
+    try {
+      const response = await applicationsApi.refreshById(id);
+
+      for (let i = 0; i < 60; i++) {
+        const job = await ingestionJobsApi.getById(response.jobId);
+        if (job.status !== "PENDING") {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 900));
+      }
+    } catch {
+      // Fall through to a full fetch; errors will be handled by loadApplication.
+    } finally {
+      setRefreshing(false);
+    }
+
+    await loadApplication("initial", false);
+  }, [id, loadApplication]);
 
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-muted-foreground">
         <AlertCircle className="h-6 w-6 text-warning" />
         <p>Could not load this application.</p>
+        <Button
+          variant="outline"
+          className="rounded-xl"
+          onClick={() => void refreshFromSource()}
+          disabled={refreshing || loading}
+        >
+          {refreshing || loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Refresh details
+        </Button>
         <Button variant="outline" className="rounded-xl" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-4 w-4" />
           Back to dashboard
@@ -154,15 +214,27 @@ export default function ApplicationDetails() {
                 </div>
               </div>
 
-              {!loading && app && (
+              <div className="flex items-center gap-2">
                 <Button
+                  variant="outline"
                   className="rounded-xl"
-                  onClick={() => window.open(app.sourceUrl, "_blank", "noopener,noreferrer")}
+                  onClick={() => void refreshFromSource()}
+                  disabled={loading || refreshing}
                 >
-                  Open Source
-                  <ExternalLink className="h-4 w-4" />
+                  {refreshing || loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Refresh details
                 </Button>
-              )}
+
+                {!loading && app && (
+                  <Button
+                    className="rounded-xl"
+                    onClick={() => window.open(app.sourceUrl, "_blank", "noopener,noreferrer")}
+                  >
+                    Open Source
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </header>
 

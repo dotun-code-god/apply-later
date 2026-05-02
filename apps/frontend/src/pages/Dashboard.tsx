@@ -100,17 +100,24 @@ export default function Dashboard() {
   }, []);
 
   // ─── Load applications ─────────────────────────────────────────────────────
-  const loadApplications = useCallback(async (filter: FilterTabValue) => {
-    setAppsLoading(true);
-    setAppsError(false);
+  const loadApplications = useCallback(async (filter: FilterTabValue, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setAppsLoading(true);
+      setAppsError(false);
+    }
     try {
       const result = await applicationsApi.list({ filter: toApiFilter(filter), pageSize: 20 });
       setApplications(result.items);
       setTotalApps(result.total);
     } catch {
-      setAppsError(true);
+      if (!silent) {
+        setAppsError(true);
+      }
     } finally {
-      setAppsLoading(false);
+      if (!silent) {
+        setAppsLoading(false);
+      }
     }
   }, []);
 
@@ -170,7 +177,7 @@ export default function Dashboard() {
       await new Promise((r) => setTimeout(r, 800));
       try {
         const job = await ingestionJobsApi.getById(jobId);
-        void loadApplications(activeFilter);
+        void loadApplications(activeFilter, { silent: true });
         if (job.status !== "PENDING") {
           void loadUpcomingReminders();
           break;

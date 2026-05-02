@@ -47,6 +47,11 @@ export class ApplicationsController {
     return this.applicationsService.getApplicationById(user.sub, id);
   }
 
+  @Post(':id/refresh')
+  refreshApplication(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.applicationsService.refreshApplication(user.sub, id);
+  }
+
   @Patch(':id')
   updateApplication(
     @CurrentUser() user: AuthUser,

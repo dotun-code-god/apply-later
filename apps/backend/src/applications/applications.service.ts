@@ -239,7 +239,7 @@ export class ApplicationsService {
             evidence: evidence as unknown as Prisma.InputJsonValue,
           },
         });
-        console.log({tl})
+
         await tx.opportunity.update({
           where: { id: job.opportunityId! },
           data: {
@@ -251,9 +251,9 @@ export class ApplicationsService {
             description: ov.description ?? job.opportunity?.description ?? null,
             amount: ov.amount ?? job.opportunity?.amount ?? null,
             location: ov.location ?? job.opportunity?.location ?? null,
-            openDate: tl.openDate ? new Date(tl.openDate) : job.opportunity?.openDate ?? null,
-            deadline: tl.deadline ? new Date(tl.deadline) : job.opportunity?.deadline ?? null,
-            responseDate: tl.responseDate ? new Date(tl.responseDate) : job.opportunity?.responseDate ?? null,
+            openDate: tl.openDate && tl.openDate != "null" ? new Date(tl.openDate) : job.opportunity?.openDate ?? null,
+            deadline: tl.deadline && tl.deadline != "null" ? new Date(tl.deadline) : job.opportunity?.deadline ?? null,
+            responseDate: tl.responseDate && tl.responseDate != "null" ? new Date(tl.responseDate) : job.opportunity?.responseDate ?? null,
             currentStatus: tl.currentStatus ?? job.opportunity?.currentStatus ?? null,
             confidenceScore,
             needsUserReview,
@@ -386,6 +386,63 @@ export class ApplicationsService {
       lastViewedAt: record.lastViewedAt,
       archivedAt: record.archivedAt,
       customReminderMuted: record.customReminderMuted,
+    };
+  }
+
+  async refreshApplication(userId: number, applicationId: string) {
+    const application = await this.prisma.application.findFirst({
+      where: {
+        id: applicationId,
+        userId,
+      },
+      include: {
+        opportunity: true,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    const normalized = normalizeOpportunityUrl(application.sourceUrl);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.opportunity.update({
+        where: { id: application.opportunityId },
+        data: {
+          currentStatus: PIPELINE_STAGE_MESSAGE.QUEUED,
+        },
+      });
+
+      const job = await tx.ingestionJob.create({
+        data: {
+          userId,
+          opportunityId: application.opportunityId,
+          sourceUrl: application.sourceUrl,
+          normalizedSourceUrl: normalized.normalizedUrl,
+          canonicalUrl: application.canonicalUrl,
+          metadata: {
+            mode: 'refresh',
+            applicationId: application.id,
+            duplicateOpportunity: true,
+            pipelineStage: 'QUEUED',
+            pipelineMessage: PIPELINE_STAGE_MESSAGE.QUEUED,
+          },
+        },
+      });
+
+      return { job };
+    });
+
+    void this.processIngestionJob(result.job.id, userId);
+
+    return {
+      jobId: result.job.id,
+      status: result.job.status,
+      applicationId: application.id,
+      opportunityId: application.opportunityId,
+      canonicalUrl: application.canonicalUrl,
+      duplicateOpportunity: true,
     };
   }
 
