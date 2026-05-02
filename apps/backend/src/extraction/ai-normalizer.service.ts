@@ -24,8 +24,8 @@ export class AiNormalizerService {
   private readonly logger = new Logger(AiNormalizerService.name);
   private readonly client: Anthropic | null = null;
 
-  private static readonly DEFAULT_MODEL = 'claude-haiku-4-5';
-  private static readonly ESCALATION_MODEL = 'claude-sonnet-4-5';
+  private static readonly DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+  private static readonly ESCALATION_MODEL = 'claude-haiku-4-5-20251001' // 'claude-sonnet-4-5';
   private static readonly MAX_CONTENT_CHARS = 12_000;
   private static readonly CONFIDENCE_ESCALATION_THRESHOLD = 0.5;
   private static readonly AGENT_TIMEOUT_MS = 45_000;
@@ -171,7 +171,7 @@ ${text}`;
           model: this.toAgentModelAlias(model),
           allowedTools: [],
           permissionMode: 'plan',
-          cwd: process.cwd(),
+          // cwd: process.cwd(),
           systemPrompt,
           outputFormat: {
             type: 'json_schema',
