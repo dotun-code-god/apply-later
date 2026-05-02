@@ -334,68 +334,88 @@ export default function ApplicationDetails() {
                       </section>
                     )}
 
-                    <div className="gap-x-[1em] md:columns-2 columns-1 mb-6">
+                    <div className="grid lg:grid-cols-[1fr_auto] lg:items-start xl:grid-cols-[1fr_360px]">
+                      {/* 70% — main intel content */}
+                      <div className="space-y-4 lg:pr-6">
                         {intel?.aiGuidance?.keyHighlights && intel.aiGuidance.keyHighlights.length > 0 && (
-                        <section className="rounded-2xl border border-border/70 bg-card p-4 break-inside-avoid box-border mb-[1em]">
+                          <section className="rounded-2xl border border-border/70 bg-card p-4">
                             <h2 className="font-display text-lg font-semibold">Key Highlights</h2>
                             <ul className="mt-3 space-y-2">
-                            {intel.aiGuidance.keyHighlights.map((item, idx) => (
+                              {intel.aiGuidance.keyHighlights.map((item, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                                {item}
+                                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                  {item}
                                 </li>
-                            ))}
+                              ))}
                             </ul>
-                        </section>
+                          </section>
                         )}
 
                         {intel?.eligibilityAndRequirements?.eligibilityCriteria && intel.eligibilityAndRequirements.eligibilityCriteria.length > 0 && (
-                        <section className="rounded-2xl border border-border/70 bg-card p-4 break-inside-avoid box-border mb-[1em]">
+                          <section className="rounded-2xl border border-border/70 bg-card p-4">
                             <h2 className="font-display text-lg font-semibold">Eligibility Criteria</h2>
                             <ul className="mt-3 space-y-2">
-                            {intel.eligibilityAndRequirements.eligibilityCriteria.map((item, idx) => (
+                              {intel.eligibilityAndRequirements.eligibilityCriteria.map((item, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                                {item}
+                                  <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                  {item}
                                 </li>
-                            ))}
+                              ))}
                             </ul>
-                        </section>
+                          </section>
                         )}
 
                         {intel?.eligibilityAndRequirements?.requiredDocuments && intel.eligibilityAndRequirements.requiredDocuments.length > 0 && (
-                        <section className="rounded-2xl border border-border/70 bg-card p-4 break-inside-avoid box-border mb-[1em]">
+                          <section className="rounded-2xl border border-border/70 bg-card p-4">
                             <h2 className="font-display text-lg font-semibold">Required Documents</h2>
                             <ul className="mt-3 space-y-2">
-                            {intel.eligibilityAndRequirements.requiredDocuments.map((item, idx) => (
+                              {intel.eligibilityAndRequirements.requiredDocuments.map((item, idx) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                                {item}
+                                  <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                  {item}
                                 </li>
-                            ))}
+                              ))}
                             </ul>
-                        </section>
+                          </section>
+                        )}
+                      </div>
+
+                      {/* 30% — AI guidance sidebar */}
+                      <div className="space-y-4 lg:border-l lg:border-border/70 lg:pl-6">
+                        {intel?.aiGuidance?.whatMakesAGoodApplication && intel.aiGuidance.whatMakesAGoodApplication.length > 0 && (
+                          <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                            <div className="mb-3 flex items-center gap-2">
+                              <Sparkles className="h-4 w-4 text-primary" />
+                              <h2 className="font-display text-base font-semibold">What Makes A Good Application</h2>
+                            </div>
+                            <ul className="space-y-2 max-h-100 overflow-y-auto">
+                              {intel.aiGuidance.whatMakesAGoodApplication.map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                                  {item}
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
                         )}
 
-                        {intel?.aiGuidance?.whatMakesAGoodApplication && (
-                        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4 break-inside-avoid box-border mb-[1em]">
-                            <div className="mb-2 flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                            <h2 className="font-display text-lg font-semibold">What Makes A Good Application</h2>
+                        {intel?.aiGuidance?.caveats && intel.aiGuidance.caveats.length > 0 && (
+                          <section className="rounded-2xl border border-rose/20 bg-rose/5 p-4">
+                            <div className="mb-3 flex items-center gap-2">
+                              <ShieldAlert className="h-4 w-4 text-rose" />
+                              <h2 className="font-display text-base font-semibold">Things To Avoid</h2>
                             </div>
-                            <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.whatMakesAGoodApplication}</p>
-                        </section>
+                            <ul className="space-y-2 max-h-100 overflow-y-auto">
+                              {intel.aiGuidance.caveats.map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose" />
+                                  {item}
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
                         )}
-
-                        {intel?.aiGuidance?.caveats && (
-                        <section className="rounded-2xl border border-rose/20 bg-rose/5 p-4 break-inside-avoid box-border mb-[1em]">
-                            <div className="mb-2 flex items-center gap-2">
-                            <ShieldAlert className="h-4 w-4 text-rose" />
-                            <h2 className="font-display text-lg font-semibold">Things To Avoid</h2>
-                            </div>
-                            <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.caveats}</p>
-                        </section>
-                        )}
+                      </div>
                     </div>
 
                     {app.stageHistory.length > 0 && (

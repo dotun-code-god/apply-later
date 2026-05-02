@@ -147,8 +147,8 @@ export class AiNormalizerService {
         currentStatus: (extracted.currentStatus as string) ?? null,
       },
       aiGuidance: {
-        whatMakesAGoodApplication: (extracted.whatMakesAGoodApplication as string) ?? null,
-        caveats: (extracted.caveats as string) ?? null,
+        whatMakesAGoodApplication: (extracted.whatMakesAGoodApplication as string[]) ?? [],
+        caveats: (extracted.caveats as string[]) ?? [],
         keyHighlights: (extracted.keyHighlights as string[]) ?? [],
       },
       metadata: {
@@ -254,8 +254,8 @@ Extract all information using the extract_opportunity_intelligence tool. For any
             deadline: { type: 'string', description: 'Application deadline in YYYY-MM-DD format, or null' },
             responseDate: { type: 'string', description: 'When applicants will hear back in YYYY-MM-DD format, or null' },
             currentStatus: { type: 'string', description: 'e.g. Open for Applications, Closed, Coming Soon' },
-            whatMakesAGoodApplication: { type: 'string', description: 'AI insight into what the selection committee values and what a strong submission looks like. This is original ApplyLater content not found on the source site.' },
-            caveats: { type: 'string', description: 'Common mistakes, disqualifiers, and things applicants should avoid. Original ApplyLater content.' },
+            whatMakesAGoodApplication: { type: 'array', items: { type: 'string' }, description: 'AI insights into what the selection committee values and what a strong submission looks like. Each element is a distinct actionable tip. This is original ApplyLater content not found on the source site.' },
+            caveats: { type: 'array', items: { type: 'string' }, description: 'Common mistakes, disqualifiers, and things applicants should avoid. Each element is a distinct mistake or warning. Original ApplyLater content.' },
             keyHighlights: {
               type: 'array',
               items: { type: 'string' },
@@ -342,8 +342,8 @@ Extract all information using the extract_opportunity_intelligence tool. For any
       eligibilityAndRequirements: { eligibilityCriteria: [], requiredDocuments: [], formFields: [], confidence: 0 },
       timelines: { openDate: null, deadline: null, responseDate: null, currentStatus: null },
       aiGuidance: {
-        whatMakesAGoodApplication: null,
-        caveats: null,
+        whatMakesAGoodApplication: [],
+        caveats: [],
         keyHighlights: needsUserReview ? ['Manual review recommended — AI extraction was unavailable'] : [],
       },
       metadata: {

@@ -120,8 +120,8 @@ export interface IntelligencePayload {
     currentStatus: string | null;
   };
   aiGuidance: {
-    whatMakesAGoodApplication: string | null;
-    caveats: string | null;
+    whatMakesAGoodApplication: string[];
+    caveats: string[];
     keyHighlights: string[];
   };
   metadata: {
