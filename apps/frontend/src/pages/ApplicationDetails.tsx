@@ -214,7 +214,7 @@ export default function ApplicationDetails() {
         <DashboardSidebar active="overview" />
 
         <main className="w-full">
-          <header className="border-b border-border/70 bg-background/80 px-5 py-4 backdrop-blur-xl md:px-8">
+          <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 px-5 py-4 backdrop-blur-xl md:px-8">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate("/dashboard") }>
@@ -222,7 +222,11 @@ export default function ApplicationDetails() {
                 </Button>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Application Details</p>
-                  <h1 className="font-display text-2xl font-semibold">{app?.title ?? "Loading..."}</h1>
+                  {loading ? (
+                    <Skeleton className="mt-1 h-7 w-48 rounded-lg" />
+                  ) : (
+                    <h1 className="font-display text-2xl font-semibold">{app?.title}</h1>
+                  )}
                 </div>
               </div>
 
@@ -330,67 +334,69 @@ export default function ApplicationDetails() {
                       </section>
                     )}
 
-                    {intel?.aiGuidance?.keyHighlights && intel.aiGuidance.keyHighlights.length > 0 && (
-                      <section className="rounded-2xl border border-border/70 bg-card p-4">
-                        <h2 className="font-display text-lg font-semibold">Key Highlights</h2>
-                        <ul className="mt-3 space-y-2">
-                          {intel.aiGuidance.keyHighlights.map((item, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
+                    <div className="gap-x-[1em] md:columns-2 columns-1 mb-6">
+                        {intel?.aiGuidance?.keyHighlights && intel.aiGuidance.keyHighlights.length > 0 && (
+                        <section className="rounded-2xl border border-border/70 bg-card p-4 break-inside-avoid box-border mb-[1em]">
+                            <h2 className="font-display text-lg font-semibold">Key Highlights</h2>
+                            <ul className="mt-3 space-y-2">
+                            {intel.aiGuidance.keyHighlights.map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                {item}
+                                </li>
+                            ))}
+                            </ul>
+                        </section>
+                        )}
 
-                    {intel?.eligibilityAndRequirements?.eligibilityCriteria && intel.eligibilityAndRequirements.eligibilityCriteria.length > 0 && (
-                      <section className="rounded-2xl border border-border/70 bg-card p-4">
-                        <h2 className="font-display text-lg font-semibold">Eligibility Criteria</h2>
-                        <ul className="mt-3 space-y-2">
-                          {intel.eligibilityAndRequirements.eligibilityCriteria.map((item, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
+                        {intel?.eligibilityAndRequirements?.eligibilityCriteria && intel.eligibilityAndRequirements.eligibilityCriteria.length > 0 && (
+                        <section className="rounded-2xl border border-border/70 bg-card p-4 break-inside-avoid box-border mb-[1em]">
+                            <h2 className="font-display text-lg font-semibold">Eligibility Criteria</h2>
+                            <ul className="mt-3 space-y-2">
+                            {intel.eligibilityAndRequirements.eligibilityCriteria.map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                {item}
+                                </li>
+                            ))}
+                            </ul>
+                        </section>
+                        )}
 
-                    {intel?.eligibilityAndRequirements?.requiredDocuments && intel.eligibilityAndRequirements.requiredDocuments.length > 0 && (
-                      <section className="rounded-2xl border border-border/70 bg-card p-4">
-                        <h2 className="font-display text-lg font-semibold">Required Documents</h2>
-                        <ul className="mt-3 space-y-2">
-                          {intel.eligibilityAndRequirements.requiredDocuments.map((item, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
+                        {intel?.eligibilityAndRequirements?.requiredDocuments && intel.eligibilityAndRequirements.requiredDocuments.length > 0 && (
+                        <section className="rounded-2xl border border-border/70 bg-card p-4 break-inside-avoid box-border mb-[1em]">
+                            <h2 className="font-display text-lg font-semibold">Required Documents</h2>
+                            <ul className="mt-3 space-y-2">
+                            {intel.eligibilityAndRequirements.requiredDocuments.map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                                <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                                {item}
+                                </li>
+                            ))}
+                            </ul>
+                        </section>
+                        )}
 
-                    {intel?.aiGuidance?.whatMakesAGoodApplication && (
-                      <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-primary" />
-                          <h2 className="font-display text-lg font-semibold">What Makes A Good Application</h2>
-                        </div>
-                        <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.whatMakesAGoodApplication}</p>
-                      </section>
-                    )}
+                        {intel?.aiGuidance?.whatMakesAGoodApplication && (
+                        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4 break-inside-avoid box-border mb-[1em]">
+                            <div className="mb-2 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <h2 className="font-display text-lg font-semibold">What Makes A Good Application</h2>
+                            </div>
+                            <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.whatMakesAGoodApplication}</p>
+                        </section>
+                        )}
 
-                    {intel?.aiGuidance?.caveats && (
-                      <section className="rounded-2xl border border-rose/20 bg-rose/5 p-4">
-                        <div className="mb-2 flex items-center gap-2">
-                          <ShieldAlert className="h-4 w-4 text-rose" />
-                          <h2 className="font-display text-lg font-semibold">Things To Avoid</h2>
-                        </div>
-                        <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.caveats}</p>
-                      </section>
-                    )}
+                        {intel?.aiGuidance?.caveats && (
+                        <section className="rounded-2xl border border-rose/20 bg-rose/5 p-4 break-inside-avoid box-border mb-[1em]">
+                            <div className="mb-2 flex items-center gap-2">
+                            <ShieldAlert className="h-4 w-4 text-rose" />
+                            <h2 className="font-display text-lg font-semibold">Things To Avoid</h2>
+                            </div>
+                            <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.caveats}</p>
+                        </section>
+                        )}
+                    </div>
 
                     {app.stageHistory.length > 0 && (
                       <section className="rounded-2xl border border-border/70 bg-card p-4">

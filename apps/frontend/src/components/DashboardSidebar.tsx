@@ -29,7 +29,7 @@ export function DashboardSidebar({ active }: DashboardSidebarProps) {
 
   return (
     <aside className="hidden border-r border-border/70 bg-secondary/50 md:block">
-      <div className="flex h-full flex-col px-5 py-6">
+      <div className="sticky top-0 flex h-screen flex-col overflow-y-auto px-5 py-6">
         <div className="mb-8 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl gradient-hero">
             <span className="font-display text-lg font-semibold text-primary-foreground">A</span>
