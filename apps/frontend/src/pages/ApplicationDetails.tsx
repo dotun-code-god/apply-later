@@ -1,15 +1,21 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Calendar, Building2, Clock, ExternalLink, Bell,
   FileText, Share2, GraduationCap, MapPin, Loader2, AlertCircle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Sparkles, ShieldAlert, CheckCircle2,
+  Paperclip, ListChecks, DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-import { applicationsApi, type ApplicationDetail, type ApplicationStage } from "@/lib/api/applications-api";
+import {
+  applicationsApi,
+  type ApplicationDetail,
+  type ApplicationStage,
+  type IntelligencePayload,
+} from "@/lib/api/applications-api";
 
 const STAGE_LABEL: Record<ApplicationStage, string> = {
   ADDED: "Saved",
@@ -71,7 +77,7 @@ export default function ApplicationDetail() {
     return (
       <div className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        Loading application…
+        Loading application...
       </div>
     );
   }
@@ -101,6 +107,12 @@ export default function ApplicationDetail() {
   const daysToDeadline = app.opportunity.deadline
     ? Math.ceil((new Date(app.opportunity.deadline).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
     : null;
+
+  const intel: IntelligencePayload | null =
+    (app.latestExtraction?.payload as IntelligencePayload | null | undefined) ?? null;
+
+  const eligibility = intel?.eligibilityAndRequirements;
+  const aiGuidance = intel?.aiGuidance;
 
   return (
     <div className="min-h-screen bg-background">
@@ -133,7 +145,7 @@ export default function ApplicationDetail() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             {/* Org avatar + name */}
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl gradient-hero shadow-glow-sm">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl gradient-hero shadow-glow-sm">
                 <GraduationCap className="h-7 w-7 text-primary-foreground" />
               </div>
               <div>
@@ -178,7 +190,7 @@ export default function ApplicationDetail() {
                 <Calendar className="h-3.5 w-3.5" />
                 <span>Opens</span>
               </div>
-              <p className="text-[14px] font-semibold text-foreground">{openDateStr ?? "—"}</p>
+              <p className="text-[14px] font-semibold text-foreground">{openDateStr ?? "-"}</p>
             </div>
 
             <div
@@ -197,7 +209,7 @@ export default function ApplicationDetail() {
                   (daysToDeadline ?? 999) <= 7 ? "text-warning" : "text-foreground",
                 )}
               >
-                {deadlineStr ?? "—"}
+                {deadlineStr ?? "-"}
               </p>
               {daysToDeadline != null && (
                 <p className="mt-0.5 text-[11px] text-muted-foreground">{daysToDeadline} days left</p>
@@ -205,7 +217,7 @@ export default function ApplicationDetail() {
             </div>
           </motion.div>
 
-          {/* Extraction confidence */}
+          {/* Extraction confidence warning */}
           {(app.opportunity.needsUserReview || app.latestExtraction?.needsUserReview) && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -220,24 +232,171 @@ export default function ApplicationDetail() {
             </motion.div>
           )}
 
-          {/* About */}
-          {app.opportunity.description && (
+          {/* Amount / Compensation highlight card */}
+          {app.opportunity.amount && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.15 }}
+              className="flex items-center gap-3 rounded-2xl border border-success/25 bg-success/8 px-4 py-3"
             >
-              <h2 className="mb-2 text-[16px] font-bold text-foreground">About</h2>
-              <p className="text-[14px] leading-[1.65] text-muted-foreground">{app.opportunity.description}</p>
+              <DollarSign className="h-5 w-5 shrink-0 text-success" />
+              <div>
+                <p className="text-[11px] text-muted-foreground">Award / Compensation</p>
+                <p className="text-[14px] font-semibold text-foreground">{app.opportunity.amount}</p>
+              </div>
             </motion.div>
           )}
 
-          {/* Notes */}
-          {app.notes && (
+          {/* Key Highlights */}
+          {aiGuidance?.keyHighlights && aiGuidance.keyHighlights.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.16 }}
+            >
+              <h2 className="mb-3 text-[16px] font-bold text-foreground">Key Highlights</h2>
+              <ul className="space-y-2">
+                {aiGuidance.keyHighlights.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[14px] text-muted-foreground">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          )}
+
+          {/* AI-generated summary */}
+          {(intel?.overview.summary ?? app.opportunity.summary) && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.17 }}
+            >
+              <h2 className="mb-2 text-[16px] font-bold text-foreground">Summary</h2>
+              <p className="text-[14px] leading-[1.65] text-muted-foreground">
+                {intel?.overview.summary ?? app.opportunity.summary}
+              </p>
+            </motion.div>
+          )}
+
+          {/* About / Full description */}
+          {(intel?.overview.description ?? app.opportunity.description) && (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.18 }}
+            >
+              <h2 className="mb-2 text-[16px] font-bold text-foreground">About</h2>
+              <p className="text-[14px] leading-[1.65] text-muted-foreground">
+                {intel?.overview.description ?? app.opportunity.description}
+              </p>
+            </motion.div>
+          )}
+
+          {/* Eligibility Criteria */}
+          {eligibility?.eligibilityCriteria && eligibility.eligibilityCriteria.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+            >
+              <h2 className="mb-3 text-[16px] font-bold text-foreground">Eligibility Criteria</h2>
+              <ul className="space-y-2">
+                {eligibility.eligibilityCriteria.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 rounded-xl border border-border/50 bg-secondary/30 px-3 py-2 text-[13px] text-muted-foreground">
+                    <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              {eligibility.confidence < 0.55 && (
+                <p className="mt-2 text-[11px] text-warning">
+                  Eligibility details may be incomplete - verify on the original site.
+                </p>
+              )}
+            </motion.div>
+          )}
+
+          {/* Required Documents */}
+          {eligibility?.requiredDocuments && eligibility.requiredDocuments.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.22 }}
+            >
+              <h2 className="mb-3 text-[16px] font-bold text-foreground">Required Documents</h2>
+              <ul className="space-y-2">
+                {eligibility.requiredDocuments.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[14px] text-muted-foreground">
+                    <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          )}
+
+          {/* Form Fields */}
+          {eligibility?.formFields && eligibility.formFields.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.23 }}
+            >
+              <h2 className="mb-3 text-[16px] font-bold text-foreground">Form Fields</h2>
+              <p className="mb-2 text-[12px] text-muted-foreground">Fields you'll encounter in the application form</p>
+              <ul className="space-y-1.5">
+                {eligibility.formFields.map((item, i) => (
+                  <li key={i} className="rounded-lg border border-border/40 bg-secondary/20 px-3 py-2 text-[13px] text-muted-foreground">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          )}
+
+          {/* What Makes a Good Application */}
+          {aiGuidance?.whatMakesAGoodApplication && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.24 }}
+              className="rounded-2xl border border-primary/20 bg-primary/5 p-4"
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h2 className="text-[15px] font-bold text-foreground">What Makes a Good Application</h2>
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-1">ApplyLater AI Insight - Not on source site</p>
+              <p className="text-[14px] leading-[1.65] text-muted-foreground">{aiGuidance.whatMakesAGoodApplication}</p>
+            </motion.div>
+          )}
+
+          {/* Caveats */}
+          {aiGuidance?.caveats && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.25 }}
+              className="rounded-2xl border border-rose/20 bg-rose/5 p-4"
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-rose-500" />
+                <h2 className="text-[15px] font-bold text-foreground">Things to Avoid</h2>
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-1">ApplyLater AI Insight - Not on source site</p>
+              <p className="text-[14px] leading-[1.65] text-muted-foreground">{aiGuidance.caveats}</p>
+            </motion.div>
+          )}
+
+          {/* My Notes */}
+          {app.notes && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.26 }}
             >
               <h2 className="mb-2 text-[16px] font-bold text-foreground">My Notes</h2>
               <p className="whitespace-pre-wrap text-[14px] leading-[1.65] text-muted-foreground">
@@ -264,7 +423,7 @@ export default function ApplicationDetail() {
                 <div className="space-y-2">
                   {[...app.stageHistory].reverse().map((event) => (
                     <div key={event.id} className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/40 p-3">
-                      <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                       <div>
                         <p className="text-[13px] font-semibold text-foreground">
                           {STAGE_LABEL[event.stage] ?? event.stage}
@@ -319,3 +478,4 @@ export default function ApplicationDetail() {
     </div>
   );
 }
+

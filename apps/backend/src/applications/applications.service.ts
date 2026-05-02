@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,7 @@ import {
   ListApplicationsQueryDto,
 } from './dto/list-applications-query.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
+import { ExtractionOrchestratorService } from '@/extraction/extraction-orchestrator.service';
 
 const IN_PROGRESS_STAGES: Set<ApplicationStage> = new Set([
   ApplicationStage.ADDED,
@@ -60,42 +62,12 @@ type ApplicationListRecord = Prisma.ApplicationGetPayload<{
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ApplicationsService.name);
 
-  private extractText(html: string, pattern: RegExp) {
-    const match = html.match(pattern);
-    return match?.[1]?.trim() || null;
-  }
-
-  private stripHtml(input: string) {
-    return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  private detectLinkType(sourceUrl: string, html: string | null) {
-    const directByUrl = /(apply|application|form|typeform|jotform|airtable)/i.test(sourceUrl);
-    const directByHtml = html ? /<form\b/i.test(html) : false;
-    return directByUrl || directByHtml ? 'direct-form' : 'overview';
-  }
-
-  private async fetchPageHtml(url: string) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        redirect: 'follow',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      return await response.text();
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly extractionOrchestrator: ExtractionOrchestratorService,
+  ) {}
 
   private async processIngestionJob(jobId: string, userId: number) {
     try {
@@ -105,98 +77,64 @@ export class ApplicationsService {
           userId,
           status: IngestionJobStatus.PENDING,
         },
-        include: {
-          opportunity: true,
-        },
+        include: { opportunity: true },
       });
 
       if (!job || !job.opportunityId) {
+        this.logger.warn(`processIngestionJob: job ${jobId} not found or missing opportunityId`);
         return;
       }
 
-      const html = await this.fetchPageHtml(job.sourceUrl);
-      const title = this.extractText(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
-      const metaDescription = this.extractText(
-        html,
-        /<meta[^>]*name=["']description["'][^>]*content=["']([\s\S]*?)["'][^>]*>/i,
-      );
-      const bodyPreview = this.stripHtml(html).slice(0, 800);
-      const linkType = this.detectLinkType(job.sourceUrl, html);
+      // ── Run full layered extraction pipeline ─────────────────────────
+      const result = await this.extractionOrchestrator.extract({
+        jobId: job.id,
+        opportunityId: job.opportunityId,
+        sourceUrl: job.sourceUrl,
+        canonicalUrl: job.canonicalUrl,
+      });
 
-      const titleConfidence = title ? 0.72 : 0.2;
-      const descriptionConfidence = metaDescription ? 0.65 : bodyPreview ? 0.4 : 0.1;
-      const overallConfidence = Number(((titleConfidence + descriptionConfidence) / 2).toFixed(2));
-      const needsUserReview = overallConfidence < 0.65;
+      const { payload, evidence, confidenceScore, needsUserReview, extractionMethod } = result;
+      const ci = payload.coreIdentity;
+      const ov = payload.overview;
+      const tl = payload.timelines;
 
-      const payload = {
-        coreIdentity: {
-          sourceUrl: job.sourceUrl,
-          canonicalUrl: job.canonicalUrl,
-          inferredType: linkType,
-        },
-        overview: {
-          title,
-          description: metaDescription ?? bodyPreview ?? null,
-        },
-        eligibilityRequirements: {
-          items: [],
-          confidence: 0,
-        },
-        timelines: {
-          deadline: null,
-          responseDate: null,
-        },
-        aiGuidance: {
-          summary: 'Initial extraction completed. Review details to confirm accuracy.',
-          warnings: needsUserReview ? ['Low confidence extraction, manual review required'] : [],
-        },
-        metadata: {
-          extractionMethod: 'builtin-fetch-html',
-          linkType,
-          confidence: overallConfidence,
-        },
-      };
-
+      // ── Persist results in a single transaction ───────────────────────
       await this.prisma.$transaction(async (tx) => {
         await tx.extractionResult.create({
           data: {
             ingestionJobId: job.id,
             opportunityId: job.opportunityId ?? undefined,
-            provider: 'builtin',
-            extractionMethod: 'fetch-html',
-            confidenceScore: overallConfidence,
+            provider: extractionMethod.includes('ai') ? 'anthropic' : 'builtin',
+            extractionMethod,
+            confidenceScore,
             needsUserReview,
-            payload,
-            evidence: {
-              sourceUrl: job.sourceUrl,
-              titleFound: !!title,
-              descriptionFound: !!metaDescription,
-            },
+            payload: payload as unknown as Prisma.InputJsonValue,
+            evidence: evidence as unknown as Prisma.InputJsonValue,
           },
         });
 
         await tx.opportunity.update({
-          where: {
-            id: job.opportunityId!,
-          },
+          where: { id: job.opportunityId! },
           data: {
-            title: title ?? job.opportunity?.title ?? null,
-            summary: metaDescription ?? job.opportunity?.summary ?? null,
-            description:
-              metaDescription ??
-              bodyPreview ??
-              job.opportunity?.description ??
-              null,
+            title: ci.title ?? job.opportunity?.title ?? null,
+            organizationName: ci.organizationName ?? job.opportunity?.organizationName ?? null,
+            category: ci.category ?? job.opportunity?.category ?? null,
+            applicationUrl: ci.applicationUrl ?? job.opportunity?.applicationUrl ?? null,
+            summary: ov.summary ?? job.opportunity?.summary ?? null,
+            description: ov.description ?? job.opportunity?.description ?? null,
+            amount: ov.amount ?? job.opportunity?.amount ?? null,
+            location: ov.location ?? job.opportunity?.location ?? null,
+            openDate: tl.openDate ? new Date(tl.openDate) : job.opportunity?.openDate ?? null,
+            deadline: tl.deadline ? new Date(tl.deadline) : job.opportunity?.deadline ?? null,
+            responseDate: tl.responseDate ? new Date(tl.responseDate) : job.opportunity?.responseDate ?? null,
+            currentStatus: tl.currentStatus ?? job.opportunity?.currentStatus ?? null,
+            confidenceScore,
             needsUserReview,
-            confidenceScore: overallConfidence,
-            currentStatus: 'open',
           },
         });
 
         await tx.ingestionJob.update({
-          where: {
-            id: job.id,
-          },
+          where: { id: job.id },
           data: {
             status: needsUserReview
               ? IngestionJobStatus.PARTIALLY_COMPLETED
@@ -204,9 +142,9 @@ export class ApplicationsService {
             completedAt: new Date(),
             metadata: {
               ...(job.metadata as Record<string, unknown> | null),
-              extractionMethod: 'builtin-fetch-html',
-              linkType,
-              confidence: overallConfidence,
+              extractionMethod,
+              linkType: ci.linkType,
+              confidence: confidenceScore,
               needsUserReview,
             },
             errorMessage: null,
@@ -214,6 +152,7 @@ export class ApplicationsService {
         });
       });
     } catch (error) {
+      this.logger.error(`processIngestionJob ${jobId} failed: ${error instanceof Error ? error.message : String(error)}`);
       await this.prisma.ingestionJob.update({
         where: { id: jobId },
         data: {

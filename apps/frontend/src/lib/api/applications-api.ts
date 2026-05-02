@@ -79,6 +79,67 @@ export interface StageEvent {
   createdAt: string;
 }
 
+// ─── Intelligence payload types (Section 11) ─────────────────────────────────
+export type LinkType = 'overview' | 'direct-form';
+export type ExtractionMethod = 'firecrawl' | 'playwright' | 'builtin-fetch' | 'firecrawl+ai' | 'playwright+ai';
+
+export interface FieldEvidence {
+  confidence: number;
+  source: string;
+}
+
+export interface IntelligencePayload {
+  coreIdentity: {
+    title: string | null;
+    organizationName: string | null;
+    category: string | null;
+    applicationUrl: string | null;
+    sourceUrl: string;
+    canonicalUrl: string;
+    linkType: LinkType;
+  };
+  overview: {
+    summary: string | null;
+    description: string | null;
+    amount: string | null;
+    location: string | null;
+  };
+  eligibilityAndRequirements: {
+    eligibilityCriteria: string[];
+    requiredDocuments: string[];
+    formFields: string[];
+    confidence: number;
+  };
+  timelines: {
+    openDate: string | null;
+    deadline: string | null;
+    responseDate: string | null;
+    currentStatus: string | null;
+  };
+  aiGuidance: {
+    whatMakesAGoodApplication: string | null;
+    caveats: string | null;
+    keyHighlights: string[];
+  };
+  metadata: {
+    confidenceScore: number;
+    extractedAt: string;
+    extractionMethod: ExtractionMethod;
+    needsUserReview: boolean;
+    linkType: LinkType;
+  };
+}
+
+export interface LatestExtraction {
+  id: string;
+  confidenceScore: number | null;
+  needsUserReview: boolean;
+  extractionMethod: string | null;
+  payload: IntelligencePayload | null;
+  evidence: Record<string, FieldEvidence> | null;
+  createdAt: string;
+}
+
 export interface ApplicationDetail extends ApplicationListItem {
   titleOverride: string | null;
   notes: string | null;
@@ -89,15 +150,7 @@ export interface ApplicationDetail extends ApplicationListItem {
   reminderRules: unknown[];
   reminders: unknown[];
   submissionArtifacts: unknown[];
-  latestExtraction: {
-    id: string;
-    confidenceScore: number | null;
-    needsUserReview: boolean;
-    extractionMethod: string | null;
-    payload: unknown;
-    evidence: unknown;
-    createdAt: string;
-  } | null;
+  latestExtraction: LatestExtraction | null;
   opportunity: {
     id: string;
     sourceUrl: string;
