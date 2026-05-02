@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Bell, BellOff, Calendar, Clock, ChevronRight, Settings2 } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { DashboardSidebar } from "@/components/DashboardSidebar";
 
 const upcomingAlerts = [
   {
@@ -31,8 +31,8 @@ const upcomingAlerts = [
 
 const alertTypeConfig: Record<string, { label: string; bg: string; text: string }> = {
   "closing-soon": { label: "Closing Soon", bg: "bg-warning/10 border-warning/20", text: "text-warning" },
-  "opening":      { label: "Opening Soon", bg: "bg-success/10 border-success/20", text: "text-success" },
-  "deadline":     { label: "Deadline",     bg: "bg-primary/10 border-primary/20", text: "text-primary" },
+  "opening": { label: "Opening Soon", bg: "bg-success/10 border-success/20", text: "text-success" },
+  deadline: { label: "Deadline", bg: "bg-primary/10 border-primary/20", text: "text-primary" },
 };
 
 export default function Alerts() {
@@ -40,163 +40,135 @@ export default function Alerts() {
   const [emailEnabled, setEmailEnabled] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background safe-area-top">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="px-5 pt-5 pb-4 sticky top-0 z-10 bg-background/95 backdrop-blur-lg border-b border-border"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[22px] font-bold text-foreground">Alerts</h1>
-            <p className="text-[13px] text-muted-foreground mt-0.5">Stay on top of every deadline</p>
-          </div>
-          <button className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-secondary transition-colors touch-manipulation">
-            <Settings2 className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-      </motion.div>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="grid min-h-screen md:grid-cols-[260px_1fr]">
+        <DashboardSidebar active="alerts" />
 
-      <main className="px-5 pb-28 pt-5">
-        {/* Notification toggles */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="rounded-2xl border border-border overflow-hidden mb-6"
-        >
-          {/* Push */}
-          <div className="flex items-center justify-between p-4 bg-card">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Bell className="w-5 h-5 text-primary" />
-              </div>
+        <main className="w-full">
+          <header className="border-b border-border/70 bg-background/80 px-5 py-4 backdrop-blur-xl md:px-8">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-[14px] font-semibold text-foreground">Push Notifications</p>
-                <p className="text-[12px] text-muted-foreground">Alerts on your device</p>
+                <h1 className="font-display text-3xl font-semibold">Alerts</h1>
+                <p className="text-sm text-muted-foreground">Stay on top of every deadline and reminder.</p>
               </div>
+              <button className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-secondary">
+                <Settings2 className="h-5 w-5 text-muted-foreground" />
+              </button>
             </div>
-            <Switch
-              checked={pushEnabled}
-              onCheckedChange={setPushEnabled}
-            />
-          </div>
+          </header>
 
-          <div className="h-px bg-border" />
-
-          {/* Email */}
-          <div className="flex items-center justify-between p-4 bg-card">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-[14px] font-semibold text-foreground">Email Digest</p>
-                <p className="text-[12px] text-muted-foreground">Weekly summary email</p>
-              </div>
-            </div>
-            <Switch
-              checked={emailEnabled}
-              onCheckedChange={setEmailEnabled}
-            />
-          </div>
-        </motion.div>
-
-        {/* Upcoming alerts */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-            Upcoming
-          </h2>
-
-          {upcomingAlerts.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingAlerts.map((alert, index) => {
-                const cfg = alertTypeConfig[alert.type];
-                return (
-                  <motion.div
-                    key={alert.id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + index * 0.07 }}
-                    className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border shadow-card touch-manipulation"
-                  >
-                    {/* Alert type dot bar */}
-                    <div className={cn(
-                      "w-[3px] self-stretch rounded-full flex-shrink-0",
-                      alert.type === "closing-soon" && "bg-warning",
-                      alert.type === "opening" && "bg-success",
-                      alert.type === "deadline" && "bg-primary",
-                    )} />
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-semibold text-foreground truncate mb-1">
-                        {alert.title}
-                      </p>
-                      <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {alert.date}
-                        </span>
-                        <span className={cn(
-                          "flex items-center gap-1 font-medium",
-                          alert.daysLeft <= 7 && "text-warning"
-                        )}>
-                          <Clock className="w-3.5 h-3.5" />
-                          {alert.daysLeft}d
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className={cn(
-                      "px-2.5 py-1 rounded-full text-[11px] font-semibold border flex-shrink-0",
-                      cfg.bg, cfg.text
-                    )}>
-                      {cfg.label}
-                    </span>
-
-                    <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
-                  </motion.div>
-                );
-              })}
-            </div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-12"
+          <div className="space-y-6 px-5 py-6 md:px-8">
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="overflow-hidden rounded-2xl border border-border bg-card"
             >
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-secondary flex items-center justify-center">
-                <BellOff className="w-8 h-8 text-muted-foreground/40" />
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <Bell className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Push Notifications</p>
+                    <p className="text-xs text-muted-foreground">Alerts on this device</p>
+                  </div>
+                </div>
+                <Switch checked={pushEnabled} onCheckedChange={setPushEnabled} />
               </div>
-              <h3 className="text-[16px] font-semibold text-foreground mb-1">No upcoming alerts</h3>
-              <p className="text-[13px] text-muted-foreground">
-                Save some opportunities to get reminded
+
+              <div className="h-px bg-border" />
+
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
+                    <Bell className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Email Digest</p>
+                    <p className="text-xs text-muted-foreground">Weekly reminder summary</p>
+                  </div>
+                </div>
+                <Switch checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+              </div>
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.06 }}
+            >
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Upcoming</h2>
+
+              {upcomingAlerts.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingAlerts.map((alert, index) => {
+                    const cfg = alertTypeConfig[alert.type];
+                    return (
+                      <motion.div
+                        key={alert.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.08 + index * 0.06 }}
+                        className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
+                      >
+                        <div
+                          className={cn(
+                            "w-0.75 self-stretch rounded-full",
+                            alert.type === "closing-soon" && "bg-warning",
+                            alert.type === "opening" && "bg-success",
+                            alert.type === "deadline" && "bg-primary",
+                          )}
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <p className="mb-1 truncate text-sm font-semibold text-foreground">{alert.title}</p>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {alert.date}
+                            </span>
+                            <span className={cn("inline-flex items-center gap-1 font-medium", alert.daysLeft <= 7 && "text-warning")}>
+                              <Clock className="h-3.5 w-3.5" />
+                              {alert.daysLeft}d
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", cfg.bg, cfg.text)}>
+                          {cfg.label}
+                        </span>
+
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-border bg-card py-12 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
+                    <BellOff className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="mb-1 text-base font-semibold text-foreground">No upcoming alerts</h3>
+                  <p className="text-sm text-muted-foreground">Save opportunities to start receiving reminders.</p>
+                </div>
+              )}
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.14 }}
+              className="rounded-2xl border border-primary/15 bg-primary/5 p-4"
+            >
+              <p className="mb-1 text-sm font-semibold text-foreground">Reminder Preferences</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Alerts are configured for 7 days, 3 days, and 24 hours before each deadline. Per-opportunity customization
+                will be available from the details workflow.
               </p>
-            </motion.div>
-          )}
-        </motion.div>
-
-        {/* Reminder settings info */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 p-4 rounded-2xl bg-primary/5 border border-primary/15"
-        >
-          <p className="text-[13px] font-semibold text-foreground mb-1">Reminder Preferences</p>
-          <p className="text-[12px] text-muted-foreground leading-relaxed">
-            You'll be notified 7 days, 3 days, and 24 hours before each deadline. Customize per-opportunity from the detail page.
-          </p>
-        </motion.div>
-      </main>
-
-      <BottomNav />
+            </motion.section>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -15,11 +15,11 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import Onboarding from "./pages/Onboarding";
 import ApplicationDetails from "./pages/ApplicationDetails";
 import Alerts from "./pages/Alerts";
 import Search from "./pages/Search";
 import Profile from "./pages/Profile";
-import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 

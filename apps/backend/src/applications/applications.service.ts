@@ -239,6 +239,7 @@ export class ApplicationsService {
             evidence: evidence as unknown as Prisma.InputJsonValue,
           },
         });
+        console.log({tl})
         await tx.opportunity.update({
           where: { id: job.opportunityId! },
           data: {
