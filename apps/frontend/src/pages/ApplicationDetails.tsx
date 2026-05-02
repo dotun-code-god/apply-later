@@ -275,6 +275,9 @@ export default function ApplicationDetails() {
                 )}
 
                 {app && (
+                  app.pipeline.isActive ? (
+                    <DetailsSkeleton />
+                  ) : (
                   <>
                     <motion.section
                       initial={{ opacity: 0, y: 12 }}
@@ -435,6 +438,7 @@ export default function ApplicationDetails() {
                       </section>
                     )}
                   </>
+                  )
                 )}
               </>
             )}
