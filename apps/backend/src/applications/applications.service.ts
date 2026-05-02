@@ -38,26 +38,55 @@ const CLOSED_STAGES: Set<ApplicationStage> = new Set([
   ApplicationStage.PARKED,
 ]);
 
-const applicationListInclude = {
-  opportunity: {
-    include: {
-      _count: {
-        select: {
-          applications: true,
+type PipelineStage =
+  | 'QUEUED'
+  | 'EXTRACTING'
+  | 'NORMALIZING'
+  | 'GATHERING'
+  | 'SYNCING'
+  | 'COMPLETED'
+  | 'FAILED';
+
+const PIPELINE_STAGE_MESSAGE: Record<PipelineStage, string> = {
+  QUEUED: 'Queued for extraction',
+  EXTRACTING: 'Extracting source content',
+  NORMALIZING: 'Normalizing opportunity data',
+  GATHERING: 'Gathering requirements and timelines',
+  SYNCING: 'Syncing opportunity to your dashboard',
+  COMPLETED: 'Sync complete',
+  FAILED: 'Sync failed',
+};
+
+const getApplicationListInclude = (userId: number) =>
+  ({
+    opportunity: {
+      include: {
+        _count: {
+          select: {
+            applications: true,
+          },
+        },
+        ingestionJobs: {
+          where: { userId },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
         },
       },
     },
-  },
-  stageEvents: {
-    orderBy: {
-      createdAt: 'desc',
+    stageEvents: {
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 1,
     },
-    take: 1,
-  },
-} satisfies Prisma.ApplicationInclude;
+  }) satisfies Prisma.ApplicationInclude;
+
+type ApplicationListInclude = ReturnType<typeof getApplicationListInclude>;
 
 type ApplicationListRecord = Prisma.ApplicationGetPayload<{
-  include: typeof applicationListInclude;
+  include: ApplicationListInclude;
 }>;
 
 @Injectable()
@@ -68,6 +97,90 @@ export class ApplicationsService {
     private readonly prisma: PrismaService,
     private readonly extractionOrchestrator: ExtractionOrchestratorService,
   ) {}
+
+  private async setPipelineProgress(
+    jobId: string,
+    opportunityId: string | null,
+    stage: PipelineStage,
+    fallbackMessage?: string,
+  ) {
+    try {
+      const existing = await this.prisma.ingestionJob.findUnique({
+        where: { id: jobId },
+        select: { metadata: true, status: true },
+      });
+
+      if (!existing || existing.status !== IngestionJobStatus.PENDING) {
+        return;
+      }
+
+      const metadata = (existing.metadata as Record<string, unknown> | null) ?? {};
+      const pipelineMessage = fallbackMessage ?? PIPELINE_STAGE_MESSAGE[stage];
+
+      await this.prisma.ingestionJob.update({
+        where: { id: jobId },
+        data: {
+          metadata: {
+            ...metadata,
+            pipelineStage: stage,
+            pipelineMessage,
+          },
+        },
+      });
+
+      if (opportunityId) {
+        await this.prisma.opportunity.update({
+          where: { id: opportunityId },
+          data: {
+            currentStatus: pipelineMessage,
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to persist pipeline progress for ${jobId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private getPipelineState(record: ApplicationListRecord) {
+    const latestJob = record.opportunity.ingestionJobs[0];
+    if (!latestJob) {
+      return {
+        pipelineStage: null,
+        pipelineMessage: null,
+        isPipelineActive: false,
+      };
+    }
+
+    const metadata = (latestJob.metadata as Record<string, unknown> | null) ?? {};
+    const rawStage = typeof metadata.pipelineStage === 'string' ? metadata.pipelineStage : null;
+    const metadataMessage =
+      typeof metadata.pipelineMessage === 'string' ? metadata.pipelineMessage : null;
+
+    if (latestJob.status === IngestionJobStatus.PENDING) {
+      const pipelineStage = (rawStage as PipelineStage | null) ?? 'QUEUED';
+      return {
+        pipelineStage,
+        pipelineMessage: metadataMessage ?? PIPELINE_STAGE_MESSAGE[pipelineStage],
+        isPipelineActive: true,
+      };
+    }
+
+    if (latestJob.status === IngestionJobStatus.FAILED) {
+      return {
+        pipelineStage: 'FAILED' as const,
+        pipelineMessage: latestJob.errorMessage ?? metadataMessage ?? PIPELINE_STAGE_MESSAGE.FAILED,
+        isPipelineActive: false,
+      };
+    }
+
+    return {
+      pipelineStage: 'COMPLETED' as const,
+      pipelineMessage: metadataMessage ?? PIPELINE_STAGE_MESSAGE.COMPLETED,
+      isPipelineActive: false,
+    };
+  }
 
   private async processIngestionJob(jobId: string, userId: number) {
     try {
@@ -85,18 +198,32 @@ export class ApplicationsService {
         return;
       }
 
+      await this.setPipelineProgress(job.id, job.opportunityId, 'EXTRACTING');
+
       // ── Run full layered extraction pipeline ─────────────────────────
       const result = await this.extractionOrchestrator.extract({
         jobId: job.id,
         opportunityId: job.opportunityId,
         sourceUrl: job.sourceUrl,
         canonicalUrl: job.canonicalUrl,
+        onProgress: async (stage) => {
+          if (stage === 'extracting') {
+            await this.setPipelineProgress(job.id, job.opportunityId, 'EXTRACTING');
+            return;
+          }
+
+          await this.setPipelineProgress(job.id, job.opportunityId, 'NORMALIZING');
+        },
       });
+
+      await this.setPipelineProgress(job.id, job.opportunityId, 'GATHERING');
 
       const { payload, evidence, confidenceScore, needsUserReview, extractionMethod } = result;
       const ci = payload.coreIdentity;
       const ov = payload.overview;
       const tl = payload.timelines;
+
+      await this.setPipelineProgress(job.id, job.opportunityId, 'SYNCING');
 
       // ── Persist results in a single transaction ───────────────────────
       await this.prisma.$transaction(async (tx) => {
@@ -112,7 +239,6 @@ export class ApplicationsService {
             evidence: evidence as unknown as Prisma.InputJsonValue,
           },
         });
-
         await tx.opportunity.update({
           where: { id: job.opportunityId! },
           data: {
@@ -146,6 +272,8 @@ export class ApplicationsService {
               linkType: ci.linkType,
               confidence: confidenceScore,
               needsUserReview,
+              pipelineStage: 'COMPLETED',
+              pipelineMessage: PIPELINE_STAGE_MESSAGE.COMPLETED,
             },
             errorMessage: null,
           },
@@ -228,6 +356,7 @@ export class ApplicationsService {
     const now = Date.now();
     const deadline = record.opportunity.deadline;
     const stage = this.getCurrentStage(record);
+    const pipeline = this.getPipelineState(record);
 
     return {
       id: record.id,
@@ -238,6 +367,9 @@ export class ApplicationsService {
       category: record.opportunity.category,
       currentStage: stage,
       currentStatus: record.opportunity.currentStatus,
+      pipelineStage: pipeline.pipelineStage,
+      pipelineMessage: pipeline.pipelineMessage,
+      isPipelineActive: pipeline.isPipelineActive,
       deadline,
       openDate: record.opportunity.openDate,
       responseDate: record.opportunity.responseDate,
@@ -270,7 +402,15 @@ export class ApplicationsService {
             sourceUrl: normalized.originalUrl,
             normalizedSourceUrl: normalized.normalizedUrl,
             canonicalUrl: normalized.canonicalUrl,
+            currentStatus: PIPELINE_STAGE_MESSAGE.QUEUED,
             createdByUserId: userId,
+          },
+        });
+      } else {
+        opportunity = await tx.opportunity.update({
+          where: { id: opportunity.id },
+          data: {
+            currentStatus: PIPELINE_STAGE_MESSAGE.QUEUED,
           },
         });
       }
@@ -311,6 +451,8 @@ export class ApplicationsService {
           metadata: {
             mode: dto.mode ?? 'leave',
             duplicateOpportunity: !!existingApplication,
+            pipelineStage: 'QUEUED',
+            pipelineMessage: PIPELINE_STAGE_MESSAGE.QUEUED,
           },
         },
       });
@@ -347,7 +489,7 @@ export class ApplicationsService {
         userId,
         archivedAt: null,
       },
-      include: applicationListInclude,
+      include: getApplicationListInclude(userId),
       orderBy: {
         createdAt: 'desc',
       },
@@ -436,6 +578,11 @@ export class ApplicationsService {
               },
               take: 1,
             },
+            ingestionJobs: {
+              where: { userId },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
           },
         },
         stageEvents: {
@@ -498,6 +645,33 @@ export class ApplicationsService {
         needsUserReview: application.opportunity.needsUserReview,
         applicantCount: application.opportunity._count.applications,
       },
+      pipeline:
+        application.opportunity.ingestionJobs[0] == null
+          ? {
+              stage: null,
+              message: null,
+              isActive: false,
+            }
+          : {
+              stage:
+                application.opportunity.ingestionJobs[0].status === IngestionJobStatus.FAILED
+                  ? 'FAILED'
+                  : (((application.opportunity.ingestionJobs[0].metadata as Record<string, unknown> | null)
+                        ?.pipelineStage as string | undefined) ??
+                    (application.opportunity.ingestionJobs[0].status === IngestionJobStatus.PENDING
+                      ? 'QUEUED'
+                      : 'COMPLETED')),
+              message:
+                application.opportunity.ingestionJobs[0].status === IngestionJobStatus.FAILED
+                  ? application.opportunity.ingestionJobs[0].errorMessage ?? PIPELINE_STAGE_MESSAGE.FAILED
+                  : (((application.opportunity.ingestionJobs[0].metadata as Record<string, unknown> | null)
+                        ?.pipelineMessage as string | undefined) ??
+                    (application.opportunity.ingestionJobs[0].status === IngestionJobStatus.PENDING
+                      ? PIPELINE_STAGE_MESSAGE.QUEUED
+                      : PIPELINE_STAGE_MESSAGE.COMPLETED)),
+              isActive:
+                application.opportunity.ingestionJobs[0].status === IngestionJobStatus.PENDING,
+            },
       latestExtraction: application.opportunity.extractionResults[0]
         ? {
             id: application.opportunity.extractionResults[0].id,
@@ -594,7 +768,7 @@ export class ApplicationsService {
         userId,
         archivedAt: null,
       },
-      include: applicationListInclude,
+      include: getApplicationListInclude(userId),
     });
   }
 }

@@ -30,9 +30,11 @@ export class ExtractionOrchestratorService {
   ) {}
 
   async extract(options: ExtractionOptions): Promise<ExtractionResult> {
-    const { sourceUrl, canonicalUrl } = options;
+    const { sourceUrl, canonicalUrl, onProgress } = options;
 
     this.logger.log(`Starting extraction for ${sourceUrl}`);
+
+    await onProgress?.('extracting');
 
     // ── Layer 1: Firecrawl ────────────────────────────────────────────────
     let rawContent: RawPageContent = await this.fetchLayer1(sourceUrl);
@@ -49,6 +51,7 @@ export class ExtractionOrchestratorService {
     const linkType = this.detectLinkType(sourceUrl, rawContent);
 
     // ── Layer 3: AI normalization ─────────────────────────────────────────
+    await onProgress?.('normalizing');
     const normalized = await this.aiNormalizer.normalize(rawContent, canonicalUrl, linkType);
 
     this.logger.log(

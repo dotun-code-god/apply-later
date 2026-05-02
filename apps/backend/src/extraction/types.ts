@@ -98,4 +98,5 @@ export interface ExtractionOptions {
   opportunityId: string;
   sourceUrl: string;
   canonicalUrl: string;
+  onProgress?: (stage: 'extracting' | 'normalizing') => Promise<void> | void;
 }

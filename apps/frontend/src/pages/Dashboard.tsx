@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
-  Activity, Bell, Calendar, ChevronRight, Clock3, LayoutDashboard,
-  LogOut, Search, Settings, UserCircle2, Loader2, AlertCircle, Plus,
+  Bell, ChevronRight, Clock3, Search, UserCircle2, Loader2, AlertCircle, Plus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/features/auth/auth-provider";
 import { dashboardApi, type DashboardSummary } from "@/lib/api/dashboard-api";
 import {
   applicationsApi,
@@ -21,6 +19,7 @@ import { AddLinkModal } from "@/components/AddLinkModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AddLinkDrawer } from "@/components/AddLinkDrawer";
 import { cn } from "@/lib/utils";
+import { DashboardSidebar } from "@/components/DashboardSidebar";
 
 const STAGE_LABEL: Record<string, string> = {
   ADDED: "Saved",
@@ -50,6 +49,16 @@ const PRIORITY_FROM_STAGE: Record<string, "High" | "Medium" | "Low"> = {
   PARKED: "Low",
 };
 
+const PIPELINE_STAGE_LABEL: Record<string, string> = {
+  QUEUED: "Queued",
+  EXTRACTING: "Extracting",
+  NORMALIZING: "Normalizing",
+  GATHERING: "Gathering",
+  SYNCING: "Syncing",
+  COMPLETED: "Synced",
+  FAILED: "Failed",
+};
+
 function derivePriority(app: ApplicationListItem): "High" | "Medium" | "Low" {
   if (app.isClosingSoon) return "High";
   return PRIORITY_FROM_STAGE[app.currentStage] ?? "Low";
@@ -65,7 +74,6 @@ function toApiFilter(tab: FilterTabValue): ApplicationFilter {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
   const isMobile = useIsMobile();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -158,12 +166,12 @@ export default function Dashboard() {
   };
 
   const pollJob = async (jobId: string) => {
-    for (let i = 0; i < 10; i++) {
-      await new Promise((r) => setTimeout(r, 500));
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 800));
       try {
         const job = await ingestionJobsApi.getById(jobId);
+        void loadApplications(activeFilter);
         if (job.status !== "PENDING") {
-          void loadApplications(activeFilter);
           void loadUpcomingReminders();
           break;
         }
@@ -183,62 +191,35 @@ export default function Dashboard() {
       ]
     : null;
 
+  const getPipelineDisplay = (app: ApplicationListItem) => {
+    const stageLabel = app.pipelineStage ? PIPELINE_STAGE_LABEL[app.pipelineStage] ?? app.pipelineStage : null;
+    if (app.isPipelineActive) {
+      return {
+        tone: "active" as const,
+        label: stageLabel ?? "Processing",
+        detail: app.pipelineMessage ?? "Your link is being processed",
+      };
+    }
+
+    if (app.pipelineStage === "FAILED") {
+      return {
+        tone: "failed" as const,
+        label: "Needs retry",
+        detail: app.pipelineMessage ?? "Sync failed",
+      };
+    }
+
+    return {
+      tone: "idle" as const,
+      label: "Ready",
+      detail: app.currentStatus ?? "Tracking",
+    };
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="grid min-h-screen md:grid-cols-[260px_1fr]">
-        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-        <aside className="hidden border-r border-border/70 bg-secondary/50 md:block">
-          <div className="flex h-full flex-col px-5 py-6">
-            <div className="mb-8 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl gradient-hero">
-                <span className="font-display text-lg font-semibold text-primary-foreground">A</span>
-              </div>
-              <div>
-                <p className="font-display text-lg font-semibold">ApplyLater</p>
-                <p className="text-xs text-muted-foreground">Web dashboard</p>
-              </div>
-            </div>
-
-            <nav className="space-y-1">
-              {(
-                [
-                  [LayoutDashboard, "Overview"],
-                  [Activity, "Applications"],
-                  [Calendar, "Calendar"],
-                  [Bell, "Alerts"],
-                  [Settings, "Settings"],
-                ] as const
-              ).map(([Icon, label], idx) => (
-                <button
-                  key={label}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-                    idx === 0 ? "bg-primary text-primary-foreground" : "hover:bg-accent",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </nav>
-
-            <div className="mt-auto rounded-2xl border border-border/70 bg-card p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Signed in as</p>
-              <p className="mt-1 font-medium">{user?.username ?? user?.email ?? "User"}</p>
-              <Button
-                variant="outline"
-                className="mt-3 w-full justify-start rounded-xl"
-                onClick={async () => {
-                  await logout();
-                  navigate("/login");
-                }}
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </aside>
+        <DashboardSidebar active="overview" />
 
         {/* ── Main ────────────────────────────────────────────────────────── */}
         <main className="w-full">
@@ -301,7 +282,7 @@ export default function Dashboard() {
 
             {/* ── Application pipeline ────────────────────────────────────── */}
             <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-              <section className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+              <section id="pipeline" className="overflow-hidden rounded-2xl border border-border/70 bg-card">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
                   <h2 className="font-display text-lg font-semibold">Application Pipeline</h2>
                   <FilterTabs
@@ -344,6 +325,7 @@ export default function Dashboard() {
                         <tr className="bg-secondary/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="px-4 py-3 font-medium">Opportunity</th>
                           <th className="px-4 py-3 font-medium">Stage</th>
+                          <th className="px-4 py-3 font-medium">Pipeline</th>
                           <th className="px-4 py-3 font-medium">Deadline</th>
                           <th className="px-4 py-3 font-medium">Priority</th>
                           <th className="px-4 py-3 font-medium">Action</th>
@@ -352,6 +334,7 @@ export default function Dashboard() {
                       <tbody>
                         {filtered.map((app) => {
                           const priority = derivePriority(app);
+                          const pipeline = getPipelineDisplay(app);
                           const deadlineStr = app.deadline
                             ? new Date(app.deadline).toLocaleDateString("en-US", {
                                 month: "short",
@@ -373,6 +356,21 @@ export default function Dashboard() {
                               </td>
                               <td className="px-4 py-3 text-muted-foreground">
                                 {STAGE_LABEL[app.currentStage] ?? app.currentStage}
+                              </td>
+                              <td className="px-4 py-3">
+                                <p
+                                  className={cn(
+                                    "text-xs font-medium",
+                                    pipeline.tone === "active"
+                                      ? "text-primary"
+                                      : pipeline.tone === "failed"
+                                        ? "text-rose"
+                                        : "text-foreground",
+                                  )}
+                                >
+                                  {pipeline.label}
+                                </p>
+                                <p className="max-w-52 truncate text-xs text-muted-foreground">{pipeline.detail}</p>
                               </td>
                               <td className="px-4 py-3">{deadlineStr}</td>
                               <td className="px-4 py-3">

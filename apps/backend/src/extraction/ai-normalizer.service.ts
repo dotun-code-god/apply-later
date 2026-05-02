@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { RawPageContent, IntelligencePayload, ExtractionEvidence, LinkType } from './types';
 
 /**
@@ -28,7 +27,6 @@ export class AiNormalizerService {
   private static readonly ESCALATION_MODEL = 'claude-haiku-4-5-20251001' // 'claude-sonnet-4-5';
   private static readonly MAX_CONTENT_CHARS = 12_000;
   private static readonly CONFIDENCE_ESCALATION_THRESHOLD = 0.5;
-  private static readonly AGENT_TIMEOUT_MS = 45_000;
 
   constructor(private readonly config: ConfigService) {
     const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
@@ -65,7 +63,7 @@ export class AiNormalizerService {
     const model = wordCount > 1_500 ? AiNormalizerService.ESCALATION_MODEL : AiNormalizerService.DEFAULT_MODEL;
 
     try {
-      const result = await this.callClaudeAgentSdkExtraction(
+      const result = await this.callClaudeExtraction(
         text,
         content,
         canonicalUrl,
@@ -79,7 +77,7 @@ export class AiNormalizerService {
         model === AiNormalizerService.DEFAULT_MODEL
       ) {
         this.logger.log(`Haiku confidence ${result.confidenceScore} below threshold — escalating to Sonnet`);
-        return this.callClaudeAgentSdkExtraction(
+        return this.callClaudeExtraction(
           text,
           content,
           canonicalUrl,
@@ -95,148 +93,12 @@ export class AiNormalizerService {
     }
   }
 
-  private async callClaudeAgentSdkExtraction(
-    text: string,
-    content: RawPageContent,
-    canonicalUrl: string,
-    linkType: LinkType,
-    model: string,
-  ) {
-    const systemPrompt = `You are an expert opportunity intelligence extractor for ApplyLater.
-
-Return structured JSON only through the provided schema.
-Rules:
-- Never guess unknown fields; return null or empty arrays.
-- Assign per-field confidence scores between 0.0 and 1.0.
-- AI guidance fields (whatMakesAGoodApplication, caveats, keyHighlights) must be original advisory content.
-- Dates must be YYYY-MM-DD when determinable, otherwise null.
-- Read-only extraction only; do not suggest or perform form submission.`;
-
-    const prompt = `Extract structured intelligence from this page.
-
-URL: ${content.url}
-Canonical URL: ${canonicalUrl}
-Link Type: ${linkType}
-Page Title: ${content.title ?? 'Not available'}
-Meta Description: ${content.description ?? 'Not available'}
-
-Content:
-${text}`;
-
-    const outputSchema: Record<string, unknown> = {
-      type: 'object',
-      properties: {
-        title: { type: ['string', 'null'] },
-        organizationName: { type: ['string', 'null'] },
-        category: { type: ['string', 'null'] },
-        applicationUrl: { type: ['string', 'null'] },
-        summary: { type: ['string', 'null'] },
-        description: { type: ['string', 'null'] },
-        amount: { type: ['string', 'null'] },
-        location: { type: ['string', 'null'] },
-        eligibilityCriteria: { type: 'array', items: { type: 'string' } },
-        requiredDocuments: { type: 'array', items: { type: 'string' } },
-        formFields: { type: 'array', items: { type: 'string' } },
-        openDate: { type: ['string', 'null'] },
-        deadline: { type: ['string', 'null'] },
-        responseDate: { type: ['string', 'null'] },
-        currentStatus: { type: ['string', 'null'] },
-        whatMakesAGoodApplication: { type: ['string', 'null'] },
-        caveats: { type: ['string', 'null'] },
-        keyHighlights: { type: 'array', items: { type: 'string' } },
-        fieldConfidences: {
-          type: 'object',
-          properties: {
-            title: { type: 'number' },
-            organizationName: { type: 'number' },
-            deadline: { type: 'number' },
-            eligibilityCriteria: { type: 'number' },
-            amount: { type: 'number' },
-            location: { type: 'number' },
-          },
-          required: ['title', 'organizationName', 'deadline', 'eligibilityCriteria'],
-        },
-      },
-      required: ['fieldConfidences'],
-      additionalProperties: false,
-    };
-
-    try {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), AiNormalizerService.AGENT_TIMEOUT_MS);
-
-      const q = query({
-        prompt,
-        options: {
-          model: this.toAgentModelAlias(model),
-          allowedTools: [],
-          permissionMode: 'plan',
-          // cwd: process.cwd(),
-          systemPrompt,
-          outputFormat: {
-            type: 'json_schema',
-            schema: outputSchema,
-          },
-          abortController,
-        },
-      });
-
-      let result: { subtype?: string; structured_output?: unknown; result?: string } | null = null;
-      for await (const message of q) {
-        if (message.type === 'result') {
-          result = message as { subtype?: string; structured_output?: unknown; result?: string };
-        }
-      }
-
-      clearTimeout(timeout);
-
-      if (!result || result.subtype !== 'success') {
-        throw new Error('Claude Agent SDK returned non-success result');
-      }
-
-      const extracted = this.parseStructuredOutput(result.structured_output, result.result);
-      return this.buildNormalizedResult(extracted, content, canonicalUrl, linkType, model, 'agent-sdk');
-    } catch (agentError) {
-      this.logger.warn(
-        `Claude Agent SDK failed (${agentError instanceof Error ? agentError.message : String(agentError)}). Falling back to Anthropic SDK messages API.`,
-      );
-      return this.callClaudeExtraction(text, content, canonicalUrl, linkType, model);
-    }
-  }
-
-  private toAgentModelAlias(model: string): string {
-    if (model.includes('haiku')) return 'haiku';
-    if (model.includes('sonnet')) return 'sonnet';
-    if (model.includes('opus')) return 'opus';
-    return 'sonnet';
-  }
-
-  private parseStructuredOutput(structuredOutput: unknown, fallbackText?: string): Record<string, unknown> {
-    if (structuredOutput && typeof structuredOutput === 'object') {
-      return structuredOutput as Record<string, unknown>;
-    }
-
-    if (fallbackText) {
-      try {
-        const parsed = JSON.parse(fallbackText) as unknown;
-        if (parsed && typeof parsed === 'object') {
-          return parsed as Record<string, unknown>;
-        }
-      } catch {
-        // Ignore parse error; throw below.
-      }
-    }
-
-    throw new Error('Claude Agent SDK returned no structured output');
-  }
-
   private buildNormalizedResult(
     extracted: Record<string, unknown>,
     content: RawPageContent,
     canonicalUrl: string,
     linkType: LinkType,
     model: string,
-    source: 'agent-sdk' | 'anthropic-sdk',
   ) {
     const confidences = (extracted.fieldConfidences as Record<string, number>) ?? {};
 
@@ -307,7 +169,7 @@ ${text}`;
       fields: Object.fromEntries(
         Object.entries(confidences).map(([field, confidence]) => [
           field,
-          { confidence, source: `Extracted from ${content.fetchMethod} content via ${source}` },
+          { confidence, source: `Extracted from ${content.fetchMethod} content via anthropic-sdk` },
         ]),
       ),
       fetchMethod: payload.metadata.extractionMethod,
@@ -438,7 +300,6 @@ Extract all information using the extract_opportunity_intelligence tool. For any
       canonicalUrl,
       linkType,
       model,
-      'anthropic-sdk',
     );
     normalized.evidence.tokensUsed = response.usage?.input_tokens + response.usage?.output_tokens;
     return normalized;

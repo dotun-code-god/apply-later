@@ -33,6 +33,9 @@ export interface ApplicationListItem {
   category: string | null;
   currentStage: ApplicationStage;
   currentStatus: string | null;
+  pipelineStage: string | null;
+  pipelineMessage: string | null;
+  isPipelineActive: boolean;
   deadline: string | null;
   openDate: string | null;
   responseDate: string | null;
@@ -150,6 +153,11 @@ export interface ApplicationDetail extends ApplicationListItem {
   reminderRules: unknown[];
   reminders: unknown[];
   submissionArtifacts: unknown[];
+  pipeline: {
+    stage: string | null;
+    message: string | null;
+    isActive: boolean;
+  };
   latestExtraction: LatestExtraction | null;
   opportunity: {
     id: string;
@@ -188,6 +196,11 @@ export interface IngestionJobResponse {
   opportunityId: string | null;
   applicationId: string | null;
   errorMessage: string | null;
+  metadata: {
+    pipelineStage?: string;
+    pipelineMessage?: string;
+    [key: string]: unknown;
+  } | null;
   createdAt: string;
   updatedAt: string;
   opportunity: {

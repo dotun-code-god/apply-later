@@ -1,14 +1,26 @@
-﻿import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Calendar, Building2, Clock, ExternalLink, Bell,
-  FileText, Share2, GraduationCap, MapPin, Loader2, AlertCircle,
-  ChevronDown, ChevronUp, Sparkles, ShieldAlert, CheckCircle2,
-  Paperclip, ListChecks, DollarSign,
+  AlertCircle,
+  ArrowLeft,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock3,
+  DollarSign,
+  ExternalLink,
+  FileText,
+  ListChecks,
+  Loader2,
+  MapPin,
+  Paperclip,
+  ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   applicationsApi,
@@ -16,6 +28,7 @@ import {
   type ApplicationStage,
   type IntelligencePayload,
 } from "@/lib/api/applications-api";
+import { DashboardSidebar } from "@/components/DashboardSidebar";
 
 const STAGE_LABEL: Record<ApplicationStage, string> = {
   ADDED: "Saved",
@@ -33,6 +46,13 @@ const STAGE_LABEL: Record<ApplicationStage, string> = {
 
 type OpportunityStatus = "not-open" | "open" | "closing-soon" | "closed";
 
+const statusConfig: Record<OpportunityStatus, { label: string; tone: string }> = {
+  "not-open": { label: "Not Open Yet", tone: "bg-purple/8 border-purple/20 text-purple" },
+  open: { label: "Open", tone: "bg-success/8 border-success/20 text-success" },
+  "closing-soon": { label: "Closing Soon", tone: "bg-warning/8 border-warning/20 text-warning" },
+  closed: { label: "Closed", tone: "bg-rose/8 border-rose/20 text-rose" },
+};
+
 function deriveStatus(app: ApplicationDetail): OpportunityStatus {
   const now = new Date();
   if (app.opportunity.openDate && new Date(app.opportunity.openDate) > now) return "not-open";
@@ -46,21 +66,38 @@ function deriveStatus(app: ApplicationDetail): OpportunityStatus {
   return "open";
 }
 
-const statusConfig: Record<OpportunityStatus, { label: string; bg: string; text: string }> = {
-  "not-open": { label: "Not Open Yet", bg: "bg-purple/8 border-purple/20", text: "text-purple" },
-  "open": { label: "Open", bg: "bg-success/8 border-success/20", text: "text-success" },
-  "closing-soon": { label: "Closing Soon", bg: "bg-warning/8 border-warning/20", text: "text-warning" },
-  "closed": { label: "Closed", bg: "bg-rose/8 border-rose/20", text: "text-rose" },
+const PIPELINE_LABEL: Record<string, string> = {
+  QUEUED: "Queued",
+  EXTRACTING: "Extracting",
+  NORMALIZING: "Normalizing",
+  GATHERING: "Gathering",
+  SYNCING: "Syncing",
+  COMPLETED: "Synced",
+  FAILED: "Failed",
 };
 
-export default function ApplicationDetail() {
+function DetailsSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-28 w-full rounded-2xl" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-28 rounded-2xl" />
+        <Skeleton className="h-28 rounded-2xl" />
+      </div>
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-40 w-full rounded-2xl" />
+    </div>
+  );
+}
+
+export default function ApplicationDetails() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -73,409 +110,215 @@ export default function ApplicationDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        Loading application...
-      </div>
-    );
-  }
-
-  if (error || !app) {
+  if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-muted-foreground">
         <AlertCircle className="h-6 w-6 text-warning" />
         <p>Could not load this application.</p>
-        <Button variant="outline" className="rounded-xl" onClick={() => navigate(-1)}>
+        <Button variant="outline" className="rounded-xl" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="h-4 w-4" />
-          Go back
+          Back to dashboard
         </Button>
       </div>
     );
   }
 
-  const status = deriveStatus(app);
-  const cfg = statusConfig[status];
-
-  const openDateStr = app.opportunity.openDate
-    ? new Date(app.opportunity.openDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-    : null;
-  const deadlineStr = app.opportunity.deadline
-    ? new Date(app.opportunity.deadline).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-    : null;
-  const daysToDeadline = app.opportunity.deadline
-    ? Math.ceil((new Date(app.opportunity.deadline).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
-    : null;
-
+  const status = app ? deriveStatus(app) : "open";
+  const statusMeta = statusConfig[status];
   const intel: IntelligencePayload | null =
-    (app.latestExtraction?.payload as IntelligencePayload | null | undefined) ?? null;
+    (app?.latestExtraction?.payload as IntelligencePayload | null | undefined) ?? null;
 
-  const eligibility = intel?.eligibilityAndRequirements;
-  const aiGuidance = intel?.aiGuidance;
+  const openDateStr = app?.opportunity.openDate
+    ? new Date(app.opportunity.openDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "-";
+  const deadlineStr = app?.opportunity.deadline
+    ? new Date(app.opportunity.deadline).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "-";
+  const pipelineLabel = app?.pipeline.stage ? PIPELINE_LABEL[app.pipeline.stage] ?? app.pipeline.stage : "Ready";
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-lg safe-area-top"
-      >
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-secondary transition-colors touch-manipulation"
-          >
-            <ArrowLeft className="h-5 w-5 text-foreground" />
-          </button>
-          <span className="text-[15px] font-semibold text-foreground">Details</span>
-          <div className="flex items-center gap-1">
-            <button className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-secondary transition-colors touch-manipulation">
-              <Share2 className="h-4.5 w-4.5 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-      </motion.header>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="grid min-h-screen md:grid-cols-[260px_1fr]">
+        <DashboardSidebar active="overview" />
 
-      <main className="pb-36">
-        {/* Hero gradient band */}
-        <div className={cn("border-b border-border px-5 pb-5 pt-6", cfg.bg)}>
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            {/* Org avatar + name */}
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl gradient-hero shadow-glow-sm">
-                <GraduationCap className="h-7 w-7 text-primary-foreground" />
-              </div>
-              <div>
-                {app.opportunity.organizationName && (
-                  <p className="text-[13px] text-muted-foreground">{app.opportunity.organizationName}</p>
-                )}
-                {app.opportunity.category && (
-                  <p className="text-[15px] font-semibold text-foreground">{app.opportunity.category}</p>
-                )}
-              </div>
-            </div>
-
-            <h1 className="mb-3 text-balance text-[22px] font-bold leading-snug text-foreground">
-              {app.title}
-            </h1>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={status}>{cfg.label}</StatusBadge>
-              <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                {STAGE_LABEL[app.currentStage]}
-              </span>
-              {app.opportunity.location && (
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  {app.opportunity.location}
-                </span>
-              )}
-            </div>
-          </motion.div>
-        </div>
-
-        <div className="space-y-6 px-5 pt-5">
-          {/* Timeline grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="grid grid-cols-2 gap-3"
-          >
-            <div className="rounded-2xl border border-border bg-secondary p-4">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>Opens</span>
-              </div>
-              <p className="text-[14px] font-semibold text-foreground">{openDateStr ?? "-"}</p>
-            </div>
-
-            <div
-              className={cn(
-                "rounded-2xl border p-4",
-                (daysToDeadline ?? 999) <= 7 ? "border-warning/25 bg-warning/8" : "border-border bg-secondary",
-              )}
-            >
-              <div className="mb-1.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Deadline</span>
-              </div>
-              <p
-                className={cn(
-                  "text-[14px] font-semibold",
-                  (daysToDeadline ?? 999) <= 7 ? "text-warning" : "text-foreground",
-                )}
-              >
-                {deadlineStr ?? "-"}
-              </p>
-              {daysToDeadline != null && (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{daysToDeadline} days left</p>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Extraction confidence warning */}
-          {(app.opportunity.needsUserReview || app.latestExtraction?.needsUserReview) && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.14 }}
-              className="rounded-xl border border-warning/35 bg-warning/10 p-3"
-            >
-              <p className="text-sm font-medium text-warning">Low-confidence extraction detected</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Some extracted fields may be incomplete or uncertain. Please review key details before applying.
-              </p>
-            </motion.div>
-          )}
-
-          {/* Amount / Compensation highlight card */}
-          {app.opportunity.amount && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.15 }}
-              className="flex items-center gap-3 rounded-2xl border border-success/25 bg-success/8 px-4 py-3"
-            >
-              <DollarSign className="h-5 w-5 shrink-0 text-success" />
-              <div>
-                <p className="text-[11px] text-muted-foreground">Award / Compensation</p>
-                <p className="text-[14px] font-semibold text-foreground">{app.opportunity.amount}</p>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Key Highlights */}
-          {aiGuidance?.keyHighlights && aiGuidance.keyHighlights.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.16 }}
-            >
-              <h2 className="mb-3 text-[16px] font-bold text-foreground">Key Highlights</h2>
-              <ul className="space-y-2">
-                {aiGuidance.keyHighlights.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[14px] text-muted-foreground">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          )}
-
-          {/* AI-generated summary */}
-          {(intel?.overview.summary ?? app.opportunity.summary) && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.17 }}
-            >
-              <h2 className="mb-2 text-[16px] font-bold text-foreground">Summary</h2>
-              <p className="text-[14px] leading-[1.65] text-muted-foreground">
-                {intel?.overview.summary ?? app.opportunity.summary}
-              </p>
-            </motion.div>
-          )}
-
-          {/* About / Full description */}
-          {(intel?.overview.description ?? app.opportunity.description) && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.18 }}
-            >
-              <h2 className="mb-2 text-[16px] font-bold text-foreground">About</h2>
-              <p className="text-[14px] leading-[1.65] text-muted-foreground">
-                {intel?.overview.description ?? app.opportunity.description}
-              </p>
-            </motion.div>
-          )}
-
-          {/* Eligibility Criteria */}
-          {eligibility?.eligibilityCriteria && eligibility.eligibilityCriteria.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-            >
-              <h2 className="mb-3 text-[16px] font-bold text-foreground">Eligibility Criteria</h2>
-              <ul className="space-y-2">
-                {eligibility.eligibilityCriteria.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 rounded-xl border border-border/50 bg-secondary/30 px-3 py-2 text-[13px] text-muted-foreground">
-                    <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              {eligibility.confidence < 0.55 && (
-                <p className="mt-2 text-[11px] text-warning">
-                  Eligibility details may be incomplete - verify on the original site.
-                </p>
-              )}
-            </motion.div>
-          )}
-
-          {/* Required Documents */}
-          {eligibility?.requiredDocuments && eligibility.requiredDocuments.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.22 }}
-            >
-              <h2 className="mb-3 text-[16px] font-bold text-foreground">Required Documents</h2>
-              <ul className="space-y-2">
-                {eligibility.requiredDocuments.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[14px] text-muted-foreground">
-                    <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          )}
-
-          {/* Form Fields */}
-          {eligibility?.formFields && eligibility.formFields.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.23 }}
-            >
-              <h2 className="mb-3 text-[16px] font-bold text-foreground">Form Fields</h2>
-              <p className="mb-2 text-[12px] text-muted-foreground">Fields you'll encounter in the application form</p>
-              <ul className="space-y-1.5">
-                {eligibility.formFields.map((item, i) => (
-                  <li key={i} className="rounded-lg border border-border/40 bg-secondary/20 px-3 py-2 text-[13px] text-muted-foreground">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          )}
-
-          {/* What Makes a Good Application */}
-          {aiGuidance?.whatMakesAGoodApplication && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.24 }}
-              className="rounded-2xl border border-primary/20 bg-primary/5 p-4"
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <h2 className="text-[15px] font-bold text-foreground">What Makes a Good Application</h2>
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-1">ApplyLater AI Insight - Not on source site</p>
-              <p className="text-[14px] leading-[1.65] text-muted-foreground">{aiGuidance.whatMakesAGoodApplication}</p>
-            </motion.div>
-          )}
-
-          {/* Caveats */}
-          {aiGuidance?.caveats && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.25 }}
-              className="rounded-2xl border border-rose/20 bg-rose/5 p-4"
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-rose-500" />
-                <h2 className="text-[15px] font-bold text-foreground">Things to Avoid</h2>
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-1">ApplyLater AI Insight - Not on source site</p>
-              <p className="text-[14px] leading-[1.65] text-muted-foreground">{aiGuidance.caveats}</p>
-            </motion.div>
-          )}
-
-          {/* My Notes */}
-          {app.notes && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.26 }}
-            >
-              <h2 className="mb-2 text-[16px] font-bold text-foreground">My Notes</h2>
-              <p className="whitespace-pre-wrap text-[14px] leading-[1.65] text-muted-foreground">
-                {app.notes}
-              </p>
-            </motion.div>
-          )}
-
-          {/* Stage history */}
-          {app.stageHistory && app.stageHistory.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-            >
-              <button
-                className="mb-3 flex w-full items-center justify-between text-[16px] font-bold text-foreground"
-                onClick={() => setShowHistory((v) => !v)}
-              >
-                Stage History
-                {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
-              {showHistory && (
-                <div className="space-y-2">
-                  {[...app.stageHistory].reverse().map((event) => (
-                    <div key={event.id} className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/40 p-3">
-                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <div>
-                        <p className="text-[13px] font-semibold text-foreground">
-                          {STAGE_LABEL[event.stage] ?? event.stage}
-                        </p>
-                        {event.note && <p className="text-[12px] text-muted-foreground">{event.note}</p>}
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          {new Date(event.createdAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+        <main className="w-full">
+          <header className="border-b border-border/70 bg-background/80 px-5 py-4 backdrop-blur-xl md:px-8">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate("/dashboard") }>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Application Details</p>
+                  <h1 className="font-display text-2xl font-semibold">{app?.title ?? "Loading..."}</h1>
                 </div>
+              </div>
+
+              {!loading && app && (
+                <Button
+                  className="rounded-xl"
+                  onClick={() => window.open(app.sourceUrl, "_blank", "noopener,noreferrer")}
+                >
+                  Open Source
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
               )}
-            </motion.div>
-          )}
-
-          {/* Applicant count */}
-          {app.opportunity.applicantCount > 1 && (
-            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-secondary/30 px-4 py-3 text-[13px] text-muted-foreground">
-              <Building2 className="h-4 w-4" />
-              {app.opportunity.applicantCount} people are tracking this opportunity
             </div>
-          )}
-        </div>
-      </main>
+          </header>
 
-      {/* Fixed bottom CTA */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.3 }}
-        className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 px-5 py-4 backdrop-blur-lg safe-area-bottom"
-      >
-        <div className="flex gap-3">
-          <Button variant="outline" className="h-13 flex-1 rounded-2xl border-border text-[15px] font-medium">
-            <Bell className="mr-2 h-4 w-4" />
-            Remind Me
-          </Button>
-          <Button
-            className="h-13 flex-1 rounded-2xl gradient-hero text-[15px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 touch-manipulation"
-            onClick={() => window.open(app.sourceUrl, "_blank", "noopener,noreferrer")}
-          >
-            Apply Now
-            <ExternalLink className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </motion.div>
+          <div className="space-y-6 px-5 py-6 md:px-8">
+            {loading ? (
+              <DetailsSkeleton />
+            ) : (
+              <>
+                {app && app.pipeline.isActive && (
+                  <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wide text-primary">Pipeline In Progress</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{pipelineLabel}</p>
+                    <p className="text-xs text-muted-foreground">{app.pipeline.message ?? "Preparing this opportunity for your dashboard"}</p>
+                  </div>
+                )}
+
+                {app && app.pipeline.stage === "FAILED" && (
+                  <div className="rounded-2xl border border-rose/30 bg-rose/10 px-4 py-3">
+                    <p className="text-sm font-medium text-rose">Pipeline sync failed</p>
+                    <p className="text-xs text-muted-foreground">{app.pipeline.message ?? "Try saving the link again."}</p>
+                  </div>
+                )}
+
+                {app && (
+                  <>
+                    <motion.section
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl border border-border/70 bg-card p-5"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status={status}>{statusMeta.label}</StatusBadge>
+                        <span className={cn("rounded-full border px-2.5 py-1 text-xs font-medium", statusMeta.tone)}>
+                          {STAGE_LABEL[app.currentStage]}
+                        </span>
+                        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                          {pipelineLabel}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        {app.opportunity.organizationName && (
+                          <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{app.opportunity.organizationName}</span>
+                        )}
+                        {app.opportunity.location && (
+                          <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{app.opportunity.location}</span>
+                        )}
+                        {app.opportunity.amount && (
+                          <span className="inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" />{app.opportunity.amount}</span>
+                        )}
+                      </div>
+                    </motion.section>
+
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Opens</p>
+                        <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium"><Calendar className="h-4 w-4 text-primary" />{openDateStr}</p>
+                      </section>
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Deadline</p>
+                        <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium"><Clock3 className="h-4 w-4 text-primary" />{deadlineStr}</p>
+                      </section>
+                    </div>
+
+                    {(intel?.overview.summary ?? app.opportunity.summary) && (
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <h2 className="font-display text-lg font-semibold">Summary</h2>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{intel?.overview.summary ?? app.opportunity.summary}</p>
+                      </section>
+                    )}
+
+                    {intel?.aiGuidance?.keyHighlights && intel.aiGuidance.keyHighlights.length > 0 && (
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <h2 className="font-display text-lg font-semibold">Key Highlights</h2>
+                        <ul className="mt-3 space-y-2">
+                          {intel.aiGuidance.keyHighlights.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    {intel?.eligibilityAndRequirements?.eligibilityCriteria && intel.eligibilityAndRequirements.eligibilityCriteria.length > 0 && (
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <h2 className="font-display text-lg font-semibold">Eligibility Criteria</h2>
+                        <ul className="mt-3 space-y-2">
+                          {intel.eligibilityAndRequirements.eligibilityCriteria.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    {intel?.eligibilityAndRequirements?.requiredDocuments && intel.eligibilityAndRequirements.requiredDocuments.length > 0 && (
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <h2 className="font-display text-lg font-semibold">Required Documents</h2>
+                        <ul className="mt-3 space-y-2">
+                          {intel.eligibilityAndRequirements.requiredDocuments.map((item, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    {intel?.aiGuidance?.whatMakesAGoodApplication && (
+                      <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          <h2 className="font-display text-lg font-semibold">What Makes A Good Application</h2>
+                        </div>
+                        <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.whatMakesAGoodApplication}</p>
+                      </section>
+                    )}
+
+                    {intel?.aiGuidance?.caveats && (
+                      <section className="rounded-2xl border border-rose/20 bg-rose/5 p-4">
+                        <div className="mb-2 flex items-center gap-2">
+                          <ShieldAlert className="h-4 w-4 text-rose" />
+                          <h2 className="font-display text-lg font-semibold">Things To Avoid</h2>
+                        </div>
+                        <p className="text-sm leading-6 text-muted-foreground">{intel.aiGuidance.caveats}</p>
+                      </section>
+                    )}
+
+                    {app.stageHistory.length > 0 && (
+                      <section className="rounded-2xl border border-border/70 bg-card p-4">
+                        <h2 className="font-display text-lg font-semibold">Stage History</h2>
+                        <div className="mt-3 space-y-2">
+                          {[...app.stageHistory].reverse().map((event) => (
+                            <div key={event.id} className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
+                              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{STAGE_LABEL[event.stage] ?? event.stage}</p>
+                                {event.note && <p className="text-xs text-muted-foreground">{event.note}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
-
