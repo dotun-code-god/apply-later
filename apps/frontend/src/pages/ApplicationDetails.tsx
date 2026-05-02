@@ -98,6 +98,7 @@ export default function ApplicationDetails() {
   const { id } = useParams<{ id: string }>();
 
   const [app, setApp] = useState<ApplicationDetail | null>(null);
+  const [showFullDescription, setShowFullDescription] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
@@ -134,6 +135,10 @@ export default function ApplicationDetails() {
   useEffect(() => {
     void loadApplication("initial", false);
   }, [loadApplication]);
+
+  useEffect(() => {
+    setShowFullDescription(false);
+  }, [app?.id]);
 
   const refreshFromSource = useCallback(async () => {
     if (!id) return;
@@ -187,6 +192,13 @@ export default function ApplicationDetails() {
   const statusMeta = statusConfig[status];
   const intel: IntelligencePayload | null =
     (app?.latestExtraction?.payload as IntelligencePayload | null | undefined) ?? null;
+  const summaryText = intel?.overview.summary ?? app?.opportunity.summary ?? null;
+  const fullDescriptionText = intel?.overview.description ?? app?.opportunity.description ?? null;
+  const canToggleDescription = Boolean(summaryText && fullDescriptionText && summaryText !== fullDescriptionText);
+  const descriptionHeading = showFullDescription && canToggleDescription ? "Full Description" : "Summary";
+  const descriptionText = showFullDescription && canToggleDescription
+    ? fullDescriptionText
+    : summaryText ?? fullDescriptionText;
 
   const openDateStr = app?.opportunity.openDate
     ? new Date(app.opportunity.openDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
@@ -299,10 +311,22 @@ export default function ApplicationDetails() {
                       </section>
                     </div>
 
-                    {(intel?.overview.summary ?? app.opportunity.summary) && (
+                    {descriptionText && (
                       <section className="rounded-2xl border border-border/70 bg-card p-4">
-                        <h2 className="font-display text-lg font-semibold">Summary</h2>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{intel?.overview.summary ?? app.opportunity.summary}</p>
+                        <div className="flex items-center justify-between gap-3">
+                          <h2 className="font-display text-lg font-semibold">{descriptionHeading}</h2>
+                          {canToggleDescription && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-xl px-3 text-xs"
+                              onClick={() => setShowFullDescription((current) => !current)}
+                            >
+                              {showFullDescription ? "View summary" : "View full description"}
+                            </Button>
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{descriptionText}</p>
                       </section>
                     )}
 
