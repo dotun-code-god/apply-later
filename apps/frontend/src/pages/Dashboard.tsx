@@ -367,7 +367,7 @@ export default function Dashboard() {
                               <td className="px-4 py-3">
                                 <p
                                   className={cn(
-                                    "text-xs font-medium",
+                                    "inline-flex items-center gap-1.5 text-xs font-medium",
                                     pipeline.tone === "active"
                                       ? "text-primary"
                                       : pipeline.tone === "failed"
@@ -375,6 +375,7 @@ export default function Dashboard() {
                                         : "text-foreground",
                                   )}
                                 >
+                                  {pipeline.tone === "active" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                   {pipeline.label}
                                 </p>
                                 <p className="max-w-52 truncate text-xs text-muted-foreground">{pipeline.detail}</p>
